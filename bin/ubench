@@ -1,0 +1,176 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+##############################################################################
+#  This file is part of the UncleBench benchmarking tool.                    #
+#        Copyright (C) 2017  EDF SA                                          #
+#                                                                            #
+#  UncleBench is free software: you can redistribute it and/or modify        #
+#  it under the terms of the GNU General Public License as published by      #
+#  the Free Software Foundation, either version 3 of the License, or         #
+#  (at your option) any later version.                                       #
+#                                                                            #
+#  UncleBench is distributed in the hope that it will be useful,             #
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+#  GNU General Public License for more details.                              #
+#                                                                            #
+#  You should have received a copy of the GNU General Public License         #
+#  along with UncleBench.  If not, see <http://www.gnu.org/licenses/>.       #
+#                                                                            #
+##############################################################################
+
+import os,sys, argparse
+import socket
+
+# Add ubench library path to PYTHONPATH
+
+if os.environ.get('UBENCH_DEV'):
+    lib_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)),"../")
+else:
+    lib_dir='/usr/share/unclebench/lib'
+
+sys.path.append(lib_dir)
+
+
+os.environ['JUBE_EXEC_SHELL']='/bin/bash'
+
+import ubench.core.ubench_commands as ubench_commands
+import ubench.core.ubench_config as uconfig
+
+
+# Set all default path
+uconf=uconfig.UbenchConfig()
+
+platform_list=uconf.get_platform_list()
+benchmark_list=uconf.get_benchmark_list()
+
+default_platform=None
+platform_required=True
+
+for platform_name in platform_list :
+    if(platform_name in socket.gethostname().lower()):
+        default_platform=platform_name
+        platform_required=False
+
+# Build an argparse with a subparse for each main ubench option
+parser = argparse.ArgumentParser(description='Unclebench benchmarking and reporting tool.',\
+                                 formatter_class=argparse.RawTextHelpFormatter)
+
+subparsers = parser.add_subparsers(dest='subparser_name')
+
+## parser for fetch
+
+fetch_help ='Download benchmarks sources and test cases '+\
+    'from benchmark defined location to /scratch/<user>/Ubench/resource (customizable with UBENCH_RESOURCE_DIR environment variable).'
+
+parser_fetch =subparsers.add_parser('fetch',help=fetch_help)
+
+parser_fetch.add_argument('-b',help='Benchmarks to run. Benchmark definition files should be located in /usr/share/unclebench/benchmarks/'+\
+                          ' (can be custumosized with UBENCH_BENCHMARK_DIR environment variable)',nargs='+',\
+                          choices=benchmark_list, required=True)
+
+# parser for run
+run_help ='Execute benchmarks.'
+
+parser_run=subparsers.add_parser('run',help=run_help)
+
+parser_run.add_argument('-p',help='Name of the test platform. Platform definition files should be located '+\
+                        ' in/usr/share/unclebench/platform/ (can be customized with UBENCH_PLATFORM_DIR environment variable)',\
+                        required=platform_required,\
+                        choices=platform_list,default=default_platform)
+
+parser_run.add_argument('-b',help='Benchmarks to run. Benchmark definition files should be located in /usr/share/unclebench/benchmarks/ '+\
+                        '(can be custumosized with UBENCH_BENCHMARK_DIR environment variable)',nargs='+', required=True,\
+                          choices=benchmark_list)
+
+parser_run.add_argument('-w',help='Nodes on which to run benchmarks ex: -w 4,pocn[380,431-433]. You can also launch job on all idle nodes ex : -w all4 to launch a benchmark with 4 nodes jobs covering evry idle node',\
+                          nargs='*',action='append')
+parser_run.add_argument('-customp',help='Set custom parameters. ex : -params mpiv:0. Use ubench listparams to know which parameters are customizable',nargs='+',default=[])
+
+
+# parser list
+list_help = 'List existing runs information for a given benchmark.'
+
+parser_list=subparsers.add_parser('list',help=list_help)
+
+parser_list.add_argument('-p',help='Name of the test platform', required=platform_required,\
+                                   choices=platform_list,default=default_platform)
+parser_list.add_argument('-b',help='Benchmark names list',required=True,nargs='+',\
+                                   choices=benchmark_list)
+
+
+# parser log
+parser_log = subparsers.add_parser('log',help='Print log of a benchmark run given its ID.')
+
+parser_log.add_argument('-p',help='Name of the test platform', required=platform_required,\
+                                   choices=platform_list,default=default_platform)
+parser_log.add_argument('-b',help='Benchmark names list',required=True,nargs='+',\
+                                   choices=benchmark_list)
+parser_log.add_argument('-i',help='Benchmark run IDs',nargs='+')
+
+
+# parser listparams
+parser_listparams = subparsers.add_parser('listparams',help='List customizable parameters of a benchmark.')
+parser_listparams.add_argument('-p',help='Name of the test platform', required=platform_required,\
+                                   choices=platform_list,default=default_platform)
+parser_listparams.add_argument('-b',help='Benchmark names list',required=True,nargs='+',\
+                                   choices=benchmark_list)
+
+# parser result
+parser_result = subparsers.add_parser('result',help='Print raw results array from a benchmark run.')
+
+parser_result.add_argument('-p',help='Name of the test platform', required=platform_required,\
+                                   choices=platform_list,default=default_platform)
+parser_result.add_argument('-b',help='Benchmark names list',required=True,nargs='+',\
+                                   choices=benchmark_list)
+parser_result.add_argument('-i',help='Benchmark run IDs',nargs='+')
+
+
+# parser report
+report_help = 'Build a performance report in UBENCH_REPORT_DIR from the '+\
+              'last executed set of benchmark. Use -b to select benchmarks to be reported.'
+
+parser_report = subparsers.add_parser('report',help=report_help)
+
+parser_report.add_argument('-p',help='Name of the test platform', required=platform_required,\
+                                   choices=platform_list,default=default_platform)
+
+parser_report.add_argument('-b',help='Benchmark names list',required=True,nargs='+',\
+                           choices=benchmark_list)
+
+# parser status
+parser_status = subparsers.add_parser('status',help='Print status of a benchmark run given its ID.')
+
+parser_status.add_argument('-p',help='Name of the test platform', required=platform_required,\
+                                   choices=platform_list,default=default_platform)
+parser_status.add_argument('-b',help='Benchmark names list',required=True,nargs='+',\
+                                   choices=benchmark_list)
+parser_status.add_argument('-i',help='Benchmark run IDs',nargs='+')
+
+# Call script according to user command
+args = parser.parse_args()
+
+# initialize class
+if vars(args).has_key('p'):
+    platform_arg = args.p
+else:
+    platform_arg = ""
+
+commands = ubench_commands.Ubench_cmd(platform=platform_arg,benchmark_list=args.b)
+
+if args.subparser_name=='run':
+    commands.run(w_list=args.w,customp_list=args.customp)
+elif args.subparser_name=='fetch':
+    commands.fetch(server=args.b)
+elif args.subparser_name=='result':
+    commands.result(id_list=args.i)
+elif args.subparser_name=='log':
+    commands.log(id_list=args.i)
+elif args.subparser_name=='list':
+    commands.listb()
+elif args.subparser_name=='listparams':
+    commands.list_parameters()
+elif args.subparser_name=='report':
+    commands.report()
+elif args.subparser_name=='status':
+    commands.status(id_list=args.i)
