@@ -1,3 +1,11 @@
+unclebench (0.2.0-0sci8u1) scibian8; urgency=low
+
+  * Add python-yaml and python-pandas as unclebench dependencies
+  * Add ubench compare man page
+  * Imported Upstream version 0.2.0
+
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Fri, 20 Apr 2018 10:27:59 +0200
+
 unclebench (0.1.3-0sci8u1) scibian8; urgency=low
 
   * Initial Scibian release
