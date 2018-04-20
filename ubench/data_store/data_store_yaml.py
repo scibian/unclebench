@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ##############################################################################
 #  This file is part of the UncleBench benchmarking tool.                    #
 #        Copyright (C) 2017  EDF SA                                          #
@@ -17,27 +18,30 @@
 #                                                                            #
 ##############################################################################
 
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
-        
-setup(name='ubench',
-      version='0.2',
-      description="Unclebench is a tool for automating the running of complex benchmarks on HPC clusters."\
-                   "It is currently based on (JUBE http://www.fz-juelich.de/ias/jsc/EN/Expertise/Support/Software/JUBE/_node.html) but any benchmarking engine can be easily integrated."\
-                   "Its architecture make it easier to handle platforms settings, benchmark descriptions, sources and test cases as separate resources."\
-                   "It provides useful commands to modify parameters on the fly without having to modify the benchmark or platform description files',",
-       install_requires=['clustershell>=1.6'],
-      url='https://github.com/edf-hpc/unclebench',
-      author='CCN HPC',
-      author_email='dsp-cspito-ccn-hpc@edf.fr',
-      scripts = ['bin/ubench'],
-      license='GPLv3',
-      packages=['ubench','ubench.core',
-                'ubench.benchmark_managers',
-                'ubench.benchmarking_tools_interfaces',
-                'ubench.data_store',
-                'ubench.plugins',
-                'ubench.scheduler_interfaces'],
-      zip_safe=False)
+import data_store
+import yaml
+
+class DataStoreYAML(data_store.DataStore):
+
+  def __init__(self,metadata=None,runs_info=None):
+    data_store.DataStore.__init__(self,metadata,runs_info)
+
+  def write(self, output_file):
+    with open(output_file, 'w') as outfile:
+      benchdata = self.metadata
+      benchdata['runs'] = self.runs_info
+      yaml.dump(benchdata, outfile, default_flow_style=False)
+
+  def load(self,input_file):
+    with open(input_file, 'r') as inputfile:
+      try:
+        data = yaml.load(inputfile)
+      except Exception as e:
+        data = None
+      if data and 'runs' in data:
+        self.runs_info = data['runs']
+        data.pop('runs',None)
+        self.metadata = data
+      else:
+        self.runs_info = None
+        self.metadata = None

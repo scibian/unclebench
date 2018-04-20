@@ -25,8 +25,16 @@ import sys
 from subprocess import call, Popen, PIPE
 import benchmarking_api as bapi
 import time
+import csv
 import ubench.core.ubench_config as uconfig
+import ubench.data_store.data_store_yaml as data_store
 import jube_xml_parser
+import tempfile
+
+try :
+  import ubench.scheduler_interfaces.slurm_interface as slurmi
+except:
+  pass
 
 class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
 
@@ -75,6 +83,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
 
         # Restore working directory
       os.chdir(old_path)
+
     return benchmark_results_path
 
 
@@ -94,7 +103,6 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         :rtype: str
         """
         return os.path.join(self.benchmark_path,self.jube_xml_files.get_bench_outputdir())
-
 
   def get_log(self,idb=-1):
         """ Get a log from a benchmark run
@@ -174,8 +182,8 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         global_status = {}
         for step in bench_steps:
             # Updating state with continue command
-            Popen('jube continue --hide-animation ./'+output_dir+' --id '+benchmark_id,cwd=os.getcwd(),stdout=open(os.devnull, "w"),shell=True)
-            time.sleep(0.5)
+            continue_cmd = Popen('jube continue --hide-animation ./'+output_dir+' --id '+benchmark_id,cwd=os.getcwd(),stdout=open(os.devnull, "w"),shell=True)
+            continue_cmd.wait()
             input_str='jube info ./'+output_dir+' --id '+benchmark_id+' --step '+step
             status_from_jube=Popen(input_str,cwd=os.getcwd(),shell=True,stdout=PIPE)
             global_status[step]=[]
@@ -191,6 +199,122 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
 
         return global_status
 
+  def write_bench_data(self,benchmark_id):
+
+        try:
+          scheduler_interface=slurmi.SlurmInterface()
+        except:
+          print "Warning!! Unable to load Slurm module"
+          scheduler_interface=None
+
+        os.chdir(self.benchmark_path)
+        output_dir = self.jube_xml_files.get_bench_outputdir()
+        benchmark_rundir = self.get_bench_rundir(benchmark_id)
+        jube_cmd ="jube info ./{0} --id {1} --step execute".format(output_dir,benchmark_id)
+
+        cmd_output = tempfile.TemporaryFile()
+        result_from_jube = Popen(jube_cmd,cwd=os.getcwd(),shell=True, stdout=cmd_output)
+        ret_code = result_from_jube.wait()
+        cmd_output.flush()
+        cmd_output.seek(0)
+        results = {}
+
+        workpackages=re.findall(r"Workpackages(.*?)\n{2,}",cmd_output.read(),re.DOTALL)[0]
+        workdirs = {}
+        regex_workdir = r"^\s+(\d+).*("+re.escape(output_dir)+r".*work).*"
+
+        for package in workpackages.split('\n'):
+          temp_match = re.match(regex_workdir,package)
+          if temp_match:
+            id_workpackage = temp_match.group(1)
+            path_workpackage = temp_match.group(2)
+            workdirs[id_workpackage] = path_workpackage
+
+        cmd_output.seek(0)
+        parameterization = re.findall(r"ID:(.*?)\n{2,}",cmd_output.read(),re.DOTALL)
+        for execution_step in parameterization:
+          id_step = [x.strip() for x in execution_step.split("\n")][0]
+          param_step = [x.strip() for x in execution_step.split("\n")][1:]
+          results[id_step] = {}
+          for parameter in param_step:
+            temp_match=re.match('^\S+:',parameter)
+            if temp_match:
+              value = parameter.replace(temp_match.group(0),'')
+              param = temp_match.group(0).replace(':','')
+              results[id_step][param] = value.strip()
+
+
+        cmd_output.close()
+
+        for key, value in results.items():
+          result_file_path = os.path.join(benchmark_rundir,"result/ubench_results.dat")
+
+          # we add the part of results which corresponds to a given execute
+          with open(result_file_path) as csvfile:
+            reader = csv.DictReader(csvfile)
+            field_names= reader.fieldnames
+            common_fields = list(set(value.keys()) & set(field_names))
+            result_fields = list(set(field_names) - set(common_fields))
+            temp_hash = {}
+
+            for field in result_fields:
+              temp_hash[field]= []
+
+            for row in reader:
+              add_to_results = True
+              for field in common_fields:
+                if value[field] != row[field]:
+                  add_to_results = False
+                  break
+              if add_to_results:
+                for field in result_fields:
+                  temp_hash[field].append(row[field])
+
+            # when there is just value we transform the array in one value
+            for field in result_fields:
+              if len(temp_hash[field]) == 1:
+                temp_hash[field] = temp_hash[field][0]
+
+
+            results[key]['results_bench'] = temp_hash
+            results[key]['context_fields'] = common_fields
+
+          #Add job information to step execute
+          job_file_path = os.path.join(workdirs[key],"stdout")
+          job_id = 0
+
+          with  open(job_file_path, 'r') as job_file:
+            for line in job_file:
+              re_result = re.findall(r'\d+',line)
+              if re_result:
+                job_id = re_result[0]
+                value['job_id_ubench'] = job_id
+                if scheduler_interface:
+                  value.update(scheduler_interface.get_job_info(job_id)[-1])
+                  results[key].update(value)
+                break
+
+        # Add metadata present on ubench.log
+        field_pattern = re.compile('(.*) : (.*)')
+
+        try:
+          log_file = open(os.path.join(benchmark_rundir,"ubench.log"),'r')
+        except IOError:
+          print 'Warning!! file ubench log was not found. Benchmark data result could not be created'
+          return
+
+        metadata = {}
+        fields = field_pattern.findall(log_file.read())
+
+        for field in fields:
+          metadata[field[0].strip()] = field[1].strip()
+
+
+        bench_data = data_store.DataStoreYAML(metadata,results)
+        bench_data.write(os.path.join(benchmark_rundir,'bench_results.yaml'))
+
+
+
   def extract_result_from_benchmark(self,benchmark_id):
         """ Get result from a jube benchmark with its id and build a python result array
         :param benchmark_id: id of the benchmark
@@ -199,25 +323,21 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         :rtype:str
         """
 
-        # Checking if all tasks have finished.
-        status = self.get_status_info(benchmark_id)
-        for step in status:
-            for task in status[step]:
-                if task['done'] == "false":
-                    print "Unfinished tasks in step: "+step+", please try later on"
-
 
         old_path=os.getcwd()
         os.chdir(self.benchmark_path)
         output_dir = self.jube_xml_files.get_bench_outputdir()
+        benchmark_rundir = self.get_bench_rundir(benchmark_id)
         input_str='jube result ./'+output_dir+' --id '+benchmark_id
         result_from_jube = Popen(input_str,cwd=os.getcwd(),shell=True, stdout=PIPE)
 
         result_array=[]
-
         # Get data from result array
         empty=True
-        for line in result_from_jube.stdout:
+        with open(os.path.join(benchmark_rundir,'result/ubench_results.dat'),'w') as result_file:
+          for line in result_from_jube.stdout:
+            result_file.write(line)
+
             empty=False
 
             splitted_line=[]
@@ -325,7 +445,8 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     :type nodes_id_list:  list of strings
     """
     self.jube_xml_files.substitute_element_text('parameter','nodes','.*','$custom_nodes')
-    self.jube_xml_files.substitute_element_text('do',None,re.escape('$submit '),'$custom_submit ')
+    if nodes_id_list:
+      self.jube_xml_files.substitute_element_text('do',None,re.escape('$submit '),'$custom_submit ')
 
     # Add an xml section describing custom nodes configurations
     self.jube_xml_files.add_custom_nodes_stub(nnodes_list,nodes_id_list)
@@ -352,3 +473,16 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     :rtype: List of 3-tuples ex:[(parameter_name,old_value,value),....]
         """
     return self.jube_xml_files.set_params_bench(dict_options)
+
+  def get_bench_rundir(self,benchmark_id):
+    """
+    Get bechmark rundir based on benchmark id
+    """
+    output_dir = self.jube_xml_files.get_bench_outputdir()
+
+    if benchmark_id == 'last':
+      jube_last_cmd = Popen('jube info ./'+output_dir+' -i last',cwd=os.getcwd(),shell=True, stdout=PIPE)
+      dir_pattern = re.compile('\S+: (\/.*)')
+      return dir_pattern.findall(jube_last_cmd.stdout.read())[0]
+    else:
+      return os.path.join(self.benchmark_path,output_dir,str(benchmark_id).zfill(6))

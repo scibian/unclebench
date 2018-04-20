@@ -52,18 +52,23 @@ class BenchmarkManager:
 
 #===============  Benchmarking part  ===============#
 
-    def run_benchmark(self,platform,w_list=[]):
+    def run_benchmark(self,platform,w_list=[],raw_cli=[]):
         """ Run benchmark on a given platform and write a ubench.log file in
         the benchmark run directory.
         :param platform: name of the platform used to retrieve parameters needed to run the benchmark.
         :type platform: str
         :param w_list: nodes configurations used to run the benchmark.
         :type w_list: list of tuples [(number of nodes, nodes id list), ....]
+        :param raw_cli: raw command line used to call ubench run
         """
         if w_list:
             try:
                 nnodes_list=[list(t) for t in zip(*w_list)][0]
                 nodes_id_list=[list(t) for t in zip(*w_list)][1]
+                # unique values in list
+                if len(list(set(nodes_id_list))) == 1 and not nodes_id_list[0]:
+                  nodes_id_list = None
+
                 self.benchmarking_api.set_custom_nodes(nnodes_list,nodes_id_list)
             except ValueError:
                 print 'Custom node configuration is not valid.'
@@ -102,6 +107,7 @@ class BenchmarkManager:
             logfile.write('Date            : {0} \n'.format(date))
             logfile.write('Run_directory   : {0} \n'.format(run_dir))
             logfile.write('Nodes           : {0} \n'.format(flattened_w_list))
+            logfile.write('cmdline         : {0} \n'.format(' '.join(raw_cli)))
 
         print '---- Use the following command to follow benchmark progress :'\
             +'    " ubench log -p {0} -b {1} -i {2}"'.format(platform,self.benchmark_name,ID)
@@ -146,7 +152,7 @@ class BenchmarkManager:
 
     def list_benchmark_runs(self):
         """ List benchmark runs with their IDs and status """
-        field_pattern = re.compile('(.*) : (.*)')
+        field_pattern = re.compile('(\S+).*: (.*)')
         field_dict={}
         max_len_key={}
         sorted_key_list=[]
@@ -161,33 +167,54 @@ class BenchmarkManager:
                     logfile_paths.append(os.path.join(result_root_dir,fd,'ubench.log'))
 
         # The second loop is need to parse files in a sorted order.
+        list_data = {}
         for filepath in sorted(logfile_paths):
             with open(filepath, 'r') as logfile:
                 nbenchs+=1
+                list_data[nbenchs] = {}
                 fields = field_pattern.findall(logfile.read())
                 for field in fields :
-                    if field[0] in field_dict:
-                        field_dict[field[0]].append(field[1])
-                        max_len_key[field[0]]=max(len(field[1]),max_len_key[field[0]])
-                    else:
-                        sorted_key_list.append(field[0]) # List to keep keys sorted in order of appearrance
-                        field_dict[field[0]]=[field[1]]
-                        max_len_key[field[0]]=max(len(field[1]),len(field[0]))
+                      if field[0] == 'Run_directory':
+                        list_data[nbenchs][field[0]] = os.path.dirname(filepath)
+                      else:
+                        list_data[nbenchs][field[0]] = field[1].strip()
 
-        if not field_dict:
+        if not list_data:
             print '----no benchmark run found for : {0}'.format(self.benchmark_name)
 
         # Print dictionnary with a table layout.
+
         separating_line=''
-        for key in sorted_key_list:
-            sys.stdout.write(key.ljust(max_len_key[key])+' | ')
-            separating_line+='-'*max_len_key[key]
+        columns = list(set([c for x in list_data.keys() for c in list_data[x].keys()]))
+
+        max_dict = {k:0 for k in columns}
+
+        for data in list_data.values():
+          max_dict.update({k:max( [ v,len(data[k]) ] ) for k,v in max_dict.items() if data.has_key(k)})
+
+        if 'Platform' in columns:
+          columns.remove('Platform')
+        if 'Benchmark_name' in columns:
+          columns.remove('Benchmark_name')
+
+        if len(list_data.values()) > 0:
+          header = list_data.values()[0]
+          print("\nPlatform: {0} \nBenchmark: {1}\n".format(header['Platform'],header['Benchmark_name']))
+
+        for column in columns:
+            sys.stdout.write(column.ljust(max_dict[column])+' | ')
+            separating_line+='-'*(max_dict[column]+2)
+
+        separating_line+='-'*(len(columns)-1)
         print ''
         print separating_line
 
-        for i in range(nbenchs):
-            for key in sorted_key_list:
-                sys.stdout.write(field_dict[key][i].ljust(max_len_key[key])+' | ')
+        for bench in list_data.values():
+            for column in columns:
+              if bench.has_key(column):
+                sys.stdout.write(bench[column].ljust(max_dict[column])+' | ')
+              else:
+                sys.stdout.write(''.ljust(max_dict[column])+' | ')
             print ''
 
 
@@ -202,6 +229,7 @@ class BenchmarkManager:
         :param benchmark_id: id of the benchmark to analyze
         :type benchmark_id: int"""
         self.result_array=self.benchmarking_api.extract_result_from_benchmark(benchmark_id)
+        self.benchmarking_api.write_bench_data(benchmark_id)
         self.transposed_result_array=[list(x) for x in zip(*self.result_array)]
 
     def analyse_last_benchmark(self):

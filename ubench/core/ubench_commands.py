@@ -23,6 +23,8 @@ import os, datetime, getpass
 from subprocess import Popen
 import ubench_config as uconfig
 import auto_benchmarker as abench
+
+
 import re
 try :
   import ubench.scheduler_interfaces.slurm_interface as slurmi
@@ -31,6 +33,7 @@ except:
 
 import ubench.benchmarking_tools_interfaces.jube_xml_parser as jube_xml_parser
 import fetcher
+import ubench_comparator as uc
 
 class Ubench_cmd:
 
@@ -47,6 +50,7 @@ class Ubench_cmd:
     self.benchmark_list = benchmark_list
     self.auto_bm = abench.AutoBenchmarker('')
     self.auto_bm.add_benchmark_managers_from_path(uconf.plugin_dir,benchmark_list,platform)
+    
 
   def log(self,id_list=[]):
 
@@ -129,7 +133,7 @@ class Ubench_cmd:
           idb='last'
         bm.status(idb)
 
-  def run(self,w_list=[],customp_list=[]):
+  def run(self,w_list=[],customp_list=[],raw_cli=[]):
 
     if w_list:
       try:
@@ -162,14 +166,14 @@ class Ubench_cmd:
       dict_options = {}
       for elem in customp_list:
         try:
-          splitted_param=re.split(':',elem)
+          splitted_param=re.split(':',elem,1)
           dict_options[splitted_param[0]]=splitted_param[1]
         except Exception as e:
-          print '---- {0} is not formated correctly, please consider using : -customp param:new_value'.format(elem)
+          print '---- {0} is not formated correctly, please consider using : -c param:new_value'.format(elem)
 
       bm.set_parameter(dict_options)
 
-      bm.run_benchmark(self.platform,w_list)
+      bm.run_benchmark(self.platform,w_list,raw_cli)
 
   def report(self):
     from jinja2 import Environment, PackageLoader
@@ -227,25 +231,48 @@ class Ubench_cmd:
     print 'Report was built in '+global_report_dir_path
 
   def fetch(self,server=[]):
+
     for benchmark_name in self.benchmark_list:
       benchmark_dir = os.path.join(self.bench_dir,benchmark_name)
       benchmark_files = [file_b for  file_b in os.listdir(benchmark_dir) if file_b.endswith(".xml")]
       jube_xml_files = jube_xml_parser.JubeXMLParser(benchmark_dir,benchmark_files)
       multisource = jube_xml_files.get_bench_multisource()
+
       if multisource is None:
         print "ERROR !! : Multisource information for benchmark not found"
         return None
 
       fetch_bench = fetcher.Fetcher(resource_dir=self.resource_dir,benchmark_name=benchmark_name)
       for source in multisource:
+
+        if not source.has_key('do_cmds'):
+          source['do_cmds'] = None
+
         if source['protocol'] == 'https':
           fetch_bench.https(source['url'],source['files'])
-        elif source['protocol'] == 'svn':
+        elif source['protocol'] == 'svn' or source['protocol'] == 'git':
           if not source.has_key('revision'):
             source['revision'] = None
-          fetch_bench.svn_checkout(source['url'],source['files'],source['revision'])
+          if not source.has_key('branch'):
+            source['branch'] = None
+
+          fetch_bench.scm_fetch(source['url'],source['files'],source['protocol'],source['revision'],source['branch'],source['do_cmds'])
+
         elif source['protocol'] == 'local':
           fetch_bench.local(source['files'])
+
+
+  def compare(self,result_directories,context_list=None,additional_fields=None,threshold=None):
+    """
+    Compare bencharks results from different directories.
+    """
+    ucomparator=uc.UbenchComparator(context_list,additional_fields,threshold)
+    print("    comparing :")
+    for rdir in result_directories:
+      print("    - "+rdir)
+    print("")
+    ucomparator.print_comparison(result_directories)
+    
 
   def translate_wlist_to_scheduler_wlist(self,w_list_arg):
   # Translate ubench custom node list format to scheduler custome node list format

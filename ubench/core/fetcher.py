@@ -25,37 +25,63 @@ import shutil
 
 class Fetcher():
 
-  def __init__(self, resource_dir = "", benchmark_name="",calibre_user =getpass.getuser()):
-    self.calibre_user= calibre_user
-    self.calibre_password=""
+  def __init__(self, resource_dir = "", benchmark_name="",login =getpass.getuser()):
+    self.login = login
+    self.password = ""
     self.benchmark_name = benchmark_name
     self.resource_dir = resource_dir
 
 
   def get_credentials(self):
-    print 'Enter calibre password for user: ' + self.calibre_user
-    self.calibre_password=getpass.getpass()
+    print 'Enter password for user: ' + self.login
+    self.password=getpass.getpass()
     print ''
 
   def parse_env_variable(self,path):
     new_path = os.popen("echo " + path).read().strip()
     return new_path
 
-  def svn_checkout(self,url,files,revision=None):
-    fetch_message = 'Fetching benchmark {0} from SVN:'.format(self.benchmark_name)
+
+  def git_fetch(self,url,repo_name,benchresource_dir,commit=None,branch=None):
+    fetch_command = "git clone "
+
+    if branch:
+      fetch_command += "--branch {0} ".format(branch)
+
+    fetch_command += "--single-branch {0} ".format(url)
+
+    if commit > 0:
+      git_dir=os.path.join(benchresource_dir,repo_name)
+      fetch_command += "; ( cd {0}; git reset --hard {1} )".format(git_dir,commit)
+
+    return fetch_command
+
+  def svn_fetch(self,url,svn_file,svn_login=None,svn_password=None,revision=None):
+    fetch_command = "svn export "
+    if revision > 0:
+      fetch_command += "-r {0} ".format(revision)
+
+    fetch_command += "{0} {1} --username {2} --password '{3}' --trust-server-cert --non-interactive --no-auth-cache".format(url,svn_file,svn_login,svn_password)
+
+    return fetch_command
+
+  def scm_fetch(self,url,files,scm_name="svn",revision=None,branch=None,do_cmds=None):
+    fetch_message = 'Fetching benchmark {0} from {1}:'.format(self.benchmark_name,scm_name)
     print fetch_message
     print '-'*len(fetch_message)
-    self.get_credentials()
 
-    # create directory svn if it does not exist
+    if scm_name=="svn":
+      self.get_credentials()
+
+    # create scm directory if it does not exist
     if revision is None:
       revision = [-1]
 
     for rev in revision:
       if rev is -1:
-        benchresource_dir=os.path.join(self.resource_dir,self.benchmark_name,"svn")
+        benchresource_dir=os.path.join(self.resource_dir,self.benchmark_name,scm_name)
       else:
-        benchresource_dir=os.path.join(self.resource_dir,self.benchmark_name,"svn",rev)
+        benchresource_dir=os.path.join(self.resource_dir,self.benchmark_name,scm_name,rev)
 
       if not os.path.exists(benchresource_dir):
         os.makedirs(benchresource_dir)
@@ -64,21 +90,34 @@ class Fetcher():
         urlparsed = urlparse(url)
         if not os.path.isabs(file_bench):
           file_bench ="/"+file_bench
+
         url_file=urljoin(url,urlparsed.path+file_bench)
         base_name = os.path.basename(file_bench)
-        svn_command = "svn export "
-        if rev > 0:
-          svn_command += "-r {0} ".format(rev)
 
-        svn_command += "{0} {1} --username {2} --password '{3}' --trust-server-cert --non-interactive --no-auth-cache".format(url_file,base_name,self.calibre_user,self.calibre_password)
-        print Popen(svn_command,cwd=benchresource_dir,stdout=PIPE,shell=True)
-        svn_dir=os.path.join(self.resource_dir,self.benchmark_name,"svn")
+        fetch_command=""
+        if scm_name=="svn":
+          fetch_command = self.svn_fetch(url_file,base_name,self.login,self.password,rev)
+
+        elif scm_name=="git":
+          fetch_command = self.git_fetch(url,base_name,benchresource_dir,rev,branch)
+
+        fetch_process = Popen(fetch_command,cwd=benchresource_dir,shell=True)
+        fetch_process.wait()
+        fetch_dir=os.path.join(self.resource_dir,self.benchmark_name,scm_name)
         if rev > 0:
-          dest_symlink = os.path.join(svn_dir,rev+"_"+base_name)
+          dest_symlink = os.path.join(fetch_dir,rev+"_"+base_name)
           if not os.path.exists(dest_symlink):
-            os.symlink(os.path.join(svn_dir,rev,base_name),dest_symlink)
+            os.symlink(os.path.join(fetch_dir,rev,base_name),dest_symlink)
+
+        # Execute actions from do tags
+        if do_cmds:
+          for do_cmd in do_cmds :
+            do_process=Popen(do_cmd,cwd=os.path.join(benchresource_dir,file_bench[1:]),shell=True)
+            do_process.wait()
+
 
     print 'Benchmark {0} fetched'.format(self.benchmark_name)
+
 
   def local(self,files):
     fetch_message = 'Fetching benchmark {0} from local:'.format(self.benchmark_name)
@@ -103,8 +142,8 @@ class Fetcher():
     if(len(url.split(' '))>1):
       url_bench = url.split(' ')[0]
       self.get_credentials()
-      self.__connect(url_bench,self.calibre_user,self.calibre_password)
-      print "Connected to calibre"
+      self.__connect(url_bench,self.login,self.password)
+      print "Connected"
     else:
       url_bench = url
 
