@@ -22,15 +22,6 @@
 import os,sys, argparse
 import socket
 
-# Add ubench library path to PYTHONPATH
-
-if os.environ.get('UBENCH_DEV'):
-    lib_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)),"../")
-else:
-    lib_dir='/usr/share/unclebench/lib'
-
-sys.path.append(lib_dir)
-
 
 os.environ['JUBE_EXEC_SHELL']='/bin/bash'
 
@@ -65,7 +56,7 @@ fetch_help ='Download benchmarks sources and test cases '+\
 
 parser_fetch =subparsers.add_parser('fetch',help=fetch_help)
 
-parser_fetch.add_argument('-b',help='Benchmarks to run. Benchmark definition files should be located in /usr/share/unclebench/benchmarks/'+\
+parser_fetch.add_argument('-b',help='Benchmarks to fetch. Benchmark definition files should be located in /usr/share/unclebench/benchmarks/'+\
                           ' (can be custumosized with UBENCH_BENCHMARK_DIR environment variable)',nargs='+',\
                           choices=benchmark_list, required=True)
 
@@ -85,7 +76,7 @@ parser_run.add_argument('-b',help='Benchmarks to run. Benchmark definition files
 
 parser_run.add_argument('-w',help='Nodes on which to run benchmarks ex: -w 4,pocn[380,431-433]. You can also launch job on all idle nodes ex : -w all4 to launch a benchmark with 4 nodes jobs covering evry idle node',\
                           nargs='*',action='append')
-parser_run.add_argument('-customp',help='Set custom parameters. ex : -params mpiv:0. Use ubench listparams to know which parameters are customizable',nargs='+',default=[])
+parser_run.add_argument('-c','--custom-params',help='Set custom parameters. ex : --custom-params mpiv:0. Use ubench listparams to know which parameters are customizable',nargs='+',default=[])
 
 
 # parser list
@@ -125,7 +116,6 @@ parser_result.add_argument('-b',help='Benchmark names list',required=True,nargs=
                                    choices=benchmark_list)
 parser_result.add_argument('-i',help='Benchmark run IDs',nargs='+')
 
-
 # parser report
 report_help = 'Build a performance report in UBENCH_REPORT_DIR from the '+\
               'last executed set of benchmark. Use -b to select benchmarks to be reported.'
@@ -147,19 +137,35 @@ parser_status.add_argument('-b',help='Benchmark names list',required=True,nargs=
                                    choices=benchmark_list)
 parser_status.add_argument('-i',help='Benchmark run IDs',nargs='+')
 
+
+# parser compare
+parser_compare = subparsers.add_parser('compare',help='Compare results from different run directories.')
+
+parser_compare.add_argument('-c','--context',default=None,help='fields to use as context and should not be compared but merged in the result table',required=False,nargs='+')
+
+parser_compare.add_argument('-a','--additional-fields',default=None,help='additional fields that will not be consired as context and whose values will be compared',required=False,nargs='+')
+
+parser_compare.add_argument('-t','--threshold',default=None,help='Differences under given threshold will not be printed')
+
+parser_compare.add_argument('-d','--result-dirs', nargs='+',help='directories where results are to compared',required=True)
+
+
 # Call script according to user command
 args = parser.parse_args()
 
 # initialize class
+platform_arg = ""
+benchmark_arg= ""
 if vars(args).has_key('p'):
     platform_arg = args.p
-else:
-    platform_arg = ""
+if vars(args).has_key('b'):
+    benchmark_arg = args.b
 
-commands = ubench_commands.Ubench_cmd(platform=platform_arg,benchmark_list=args.b)
+
+commands = ubench_commands.Ubench_cmd(platform=platform_arg,benchmark_list=benchmark_arg)
 
 if args.subparser_name=='run':
-    commands.run(w_list=args.w,customp_list=args.customp)
+    commands.run(w_list=args.w,customp_list=args.custom_params,raw_cli=sys.argv)
 elif args.subparser_name=='fetch':
     commands.fetch(server=args.b)
 elif args.subparser_name=='result':
@@ -174,3 +180,5 @@ elif args.subparser_name=='report':
     commands.report()
 elif args.subparser_name=='status':
     commands.status(id_list=args.i)
+elif args.subparser_name=='compare':
+    commands.compare(args.result_dirs,args.context,args.additional_fields,args.threshold)
