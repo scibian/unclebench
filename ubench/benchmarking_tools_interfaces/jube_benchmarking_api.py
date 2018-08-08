@@ -49,12 +49,13 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     self.uconf=uconfig.UbenchConfig()
     self.benchmark_path_in = os.path.join(self.uconf.benchmark_dir,benchmark_name,benchmark_name+".xml")
     self.benchmark_name = benchmark_name
+    self.platform_name = platform_name
     benchmark_dir = os.path.join(self.uconf.benchmark_dir,benchmark_name)
     benchmark_files = [file_b for  file_b in os.listdir(benchmark_dir) if file_b.endswith(".xml")]
-
     self.benchmark_path = os.path.join(self.uconf.run_dir,platform_name,benchmark_name)
     self.jube_xml_files = jube_xml_parser.JubeXMLParser(benchmark_dir,benchmark_files,self.benchmark_path,self.uconf.platform_dir)
     self.jube_xml_files.load_platform_xml(platform_name)
+    self.jube_const_params = {}
 
   def analyse_benchmark(self,benchmark_id):
     """ Analyze benchmark results
@@ -204,7 +205,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         try:
           scheduler_interface=slurmi.SlurmInterface()
         except:
-          print "Warning!! Unable to load Slurm module"
+          print("Warning!! Unable to load Slurm module")
           scheduler_interface=None
 
         os.chdir(self.benchmark_path)
@@ -290,8 +291,10 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
                 job_id = re_result[0]
                 value['job_id_ubench'] = job_id
                 if scheduler_interface:
-                  value.update(scheduler_interface.get_job_info(job_id)[-1])
-                  results[key].update(value)
+                  job_info = scheduler_interface.get_job_info(job_id)
+                  if job_info:
+                    value.update(job_info[-1])
+                    results[key].update(value)
                 break
 
         # Add metadata present on ubench.log
@@ -300,7 +303,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         try:
           log_file = open(os.path.join(benchmark_rundir,"ubench.log"),'r')
         except IOError:
-          print 'Warning!! file ubench log was not found. Benchmark data result could not be created'
+          print('Warning!! file ubench log was not found. Benchmark data result could not be created')
           return
 
         metadata = {}
@@ -328,12 +331,34 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         os.chdir(self.benchmark_path)
         output_dir = self.jube_xml_files.get_bench_outputdir()
         benchmark_rundir = self.get_bench_rundir(benchmark_id)
-        input_str='jube result ./'+output_dir+' --id '+benchmark_id
+
+        # checking that all preprocess has finished
+
+        benchmark_runpath = os.path.join(old_path,output_dir,benchmark_rundir)
+
+        if not os.path.isfile(os.path.join(benchmark_runpath,'.bench_done')):
+          continue_cmd = Popen('jube continue --hide-animation ./'+output_dir+' --id '+benchmark_id,cwd=os.getcwd(),stdout=open(os.devnull, "w"),shell=True)
+          continue_cmd.wait()
+          flag_file = open(os.path.join(benchmark_runpath,'.bench_done'),'w')
+          flag_file.write("OK")
+          flag_file.close()
+
+        configuration_file_path=os.path.join(benchmark_runpath,'configuration.xml')
+        try :
+            self.jube_xml_files.load_config_xml(configuration_file_path)
+        except :
+            raise IOError('Cannot find: '+configuration_file_path+' file.')
+
+        # Get job errlog and outlog filenames from configuration.xml file
+        cvsfile = self.jube_xml_files.get_result_cvsfile()
+
+        input_str='jube result ./'+output_dir+' --id '+benchmark_id+' -o '+cvsfile
         result_from_jube = Popen(input_str,cwd=os.getcwd(),shell=True, stdout=PIPE)
         ret_code = result_from_jube.wait()
         result_array=[]
         # Get data from result array
         empty=True
+
         with open(os.path.join(benchmark_rundir,'result/ubench_results.dat'),'w') as result_file:
           for line in result_from_jube.stdout:
             result_file.write(line)
@@ -358,6 +383,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
 
         if (empty):
             raise IOError
+
 
         # Restore working directory
         os.chdir(old_path)
@@ -393,6 +419,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         self.jube_xml_files.add_bench_input()
         self.jube_xml_files.remove_multisource()
         self.jube_xml_files.write_bench_xml()
+        self.jube_xml_files.write_platform_xml()
         platform_dir = self.jube_xml_files.get_platform_dir()
 
         old_run_dir=self.analyse_last_benchmark()
@@ -424,16 +451,16 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         return (absolute_run_dir,ID)
 
 
-  def status(self,benchmark_id):
+  # def status(self,benchmark_id):
 
-        status = self.get_status_info(benchmark_id)
-        for step in status:
-            print "\nStatus for step: "+step
-            print "--------------------------------"
-            print "id\tstarted\tdone\tworkdir"
-            print "--------------------------------"
-            for task in status[step]:
-                print task['id'] + "\t"+ task['started']+"\t"+task['done']+"\t"+task['workdir']
+  #       status = self.get_status_info(benchmark_id)
+  #       for step in status:
+  #           print "\nStatus for step: "+step
+  #           print "--------------------------------"
+  #           print "id\tstarted\tdone\tworkdir"
+  #           print "--------------------------------"
+  #           for task in status[step]:
+  #               print task['id'] + "\t"+ task['started']+"\t"+task['done']+"\t"+task['workdir']
 
 
   def set_custom_nodes(self,nnodes_list,nodes_id_list):
@@ -446,12 +473,14 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     """
     self.jube_xml_files.substitute_element_text('parameter','nodes','.*','$custom_nodes')
     if nodes_id_list:
-      self.jube_xml_files.substitute_element_text('do',None,re.escape('$submit '),'$custom_submit ')
+      for subcmd in ["submit","{submit}","submit_singleton","{submit_singleton}"]:
+        self.jube_xml_files.substitute_element_text('do',None,re.escape('$'+subcmd+' '),
+                                                    '$custom_'+subcmd+' ')
 
     # Add an xml section describing custom nodes configurations
     self.jube_xml_files.add_custom_nodes_stub(nnodes_list,nodes_id_list)
 
-  def list_parameters(self,config_dir_path=None):
+  def list_parameters(self,default_values):
     """
     List benchmark customisable parameters
     :param config_dir_path: Optional parameter reprenting the path of the config files (usefull when a benchmark has never been run).
@@ -459,8 +488,18 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     :returns: Return a list of tuples [(param1,value),(param2,value),....]
     :rtype: list of tuples
     """
-    parameters_list={'benchmark' : self.jube_xml_files.get_params_bench(),
-                     'platform' : self.jube_xml_files.get_params_platform()}
+    platform_params = self.jube_xml_files.get_params_platform(self.platform_name)
+    benchmark_params =self.jube_xml_files.get_params_bench()
+    if default_values:
+      eval_platform_params = self.parse_jube_parameter(platform_params)
+      # platform_const = dict((y, x) for x, y in eval_platform_params) # we convert platform values into dictionary
+      eval_benchmark_params = self.parse_jube_parameter(benchmark_params)
+      parameters_list={'platform' : eval_platform_params,
+                       'benchmark' : eval_benchmark_params}
+    else:
+      parameters_list={'platform' : platform_params,
+                       'benchmark' : benchmark_params}
+
     return  parameters_list
 
   def set_parameter(self,dict_options):
@@ -472,7 +511,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     :returns: Return a list of tuples [(filename,param1,old_value,new_value),(filename,param2,old_value,new_value),....]
     :rtype: List of 3-tuples ex:[(parameter_name,old_value,value),....]
         """
-    return self.jube_xml_files.set_params_bench(dict_options)
+    return self.jube_xml_files.set_params_bench(dict_options) + self.jube_xml_files.set_params_platform(dict_options)
 
   def get_bench_rundir(self,benchmark_id):
     """
@@ -486,3 +525,55 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
       return dir_pattern.findall(jube_last_cmd.stdout.read())[0]
     else:
       return os.path.join(self.benchmark_path,output_dir,str(benchmark_id).zfill(6))
+
+  def parse_jube_parameter(self,list_jube_parameters):
+
+    # get constants
+    const_hash={}
+    variable_hash={}
+    parameter_regex_sub='(?<!\\$)(?:\\$\\$)*\\$(?!\\$)(\\{)?(.+?)(?(1)\\}|(?:\\w+|$))'
+    parameter_regex_find='(?<!\\$)(?:\\$\\$)*\\$(?!\\$)(\\{)?(.+?)(?(1)\\}|(?:\\W|$))'
+    external_variables = []
+    for k,v in list_jube_parameters:
+      variables = [m2 for m1,m2 in re.findall(parameter_regex_find,v)]
+      #import pdb;pdb.set_trace()
+      if variables:
+        # import pdb;pdb.set_trace()
+        if len(set(variables) & set([var for var,value in list_jube_parameters])) != len(set(variables)):
+          external_variables.append(k)
+        elif set(variables) & set(external_variables):
+          external_variables.append(k)
+
+    [const_hash.update({k:v}) for k,v in list_jube_parameters if not re.findall(parameter_regex_find,v)]
+    [variable_hash.update({k:v}) for k,v in list_jube_parameters if re.findall(parameter_regex_find,v)]
+
+    # we get rid of variables that cannot not be resolved, mostly Jube
+    for var in external_variables:
+      variable_hash.pop(var)
+
+    self.jube_const_params.update(const_hash)
+    parsed_data = []
+    while variable_hash:
+      temp_hash = {}
+      for k,v in variable_hash.iteritems():
+        python_exp = re.sub(parameter_regex_sub,self.val_repl,v)
+        if not re.findall(parameter_regex_find,python_exp):
+          try:
+            python_eval = eval(python_exp)
+            self.jube_const_params[k] = python_eval
+            parsed_data.append((k,str(python_eval)))
+          except (NameError, SyntaxError,TypeError,KeyError):
+            self.jube_const_params[k] = python_exp
+            parsed_data.append((k,str(python_exp)))
+        else:
+          temp_hash.update({k:python_exp})
+      variable_hash = temp_hash
+    return parsed_data
+
+  def val_repl(self,matchobj):
+    match_variable_name = re.match('^\.*\$(\w+)\.*|^\.*\$\{(\w+)\\}\.*',matchobj.group(0)).group(1,2)
+    name = [x for x in match_variable_name if x is not None ][0]
+    if self.jube_const_params.has_key(name):
+      return str(self.jube_const_params[name])
+    else:
+      return matchobj.group(0)
