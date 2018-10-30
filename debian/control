@@ -28,7 +28,6 @@ Depends: asciidoctor,
          python-yaml,
          unclebench-benchmarks (= ${binary:Version}),
          unclebench-platform (= ${binary:Version}),
-         unclebench-plugins (= ${binary:Version}),
          ${misc:Depends},
          ${python:Depends},
          ${shlibs:Depends}
@@ -36,13 +35,6 @@ Recommends: python-pyslurm
 Suggests: lmod | environment-modules
 Description: Automated benchmarking tool
  This package provides UncleBench software suite with all its components.
-
-Package: unclebench-plugins
-Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}
-Description: Benchmark specific report plugins for UncleBench benchmarking tool
- This package provides UncleBench benchmark specific plugins examples. These plugins
- define how to build performance report.
 
 Package: unclebench-platform
 Architecture: all
