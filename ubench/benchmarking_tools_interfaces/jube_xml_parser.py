@@ -115,7 +115,6 @@ class JubeXMLParser():
           source_dict['files'] = []
           for file_source in source.findall('file'):
             source_dict['files'].append(file_source.text.strip())
-
           source_dict['do_cmds'] = []
           for do_cmd in source.findall('do'):
             source_dict['do_cmds'].append(do_cmd.text.strip())
@@ -128,7 +127,13 @@ class JubeXMLParser():
           if source.find('url') is not None:
             source_dict['url'] = source.find('url').text
             if source_dict['protocol'] == 'git':
-              source_dict['files']=[source_dict['url'].split('/')[-1].split('.')[0]]
+                files = source_dict['files']
+                # Check if there is files to add else it adds the repo's name
+                if files:
+                  source_dict['files']= files
+                  source_dict['files'].append(source_dict['url'].split('/')[-1].split('.')[0])
+                else:
+                  source_dict['files']= [source_dict['url'].split('/')[-1].split('.')[0]]
 
           multisource_data.append(source_dict)
 
@@ -229,6 +234,19 @@ class JubeXMLParser():
         link = ET.SubElement(files_element,'link',attrib={'name': benchmark_name,'rel_path_ref': 'external'})
         link.text = "$UBENCH_RESOURCE_DIR/{0}/".format(benchmark_name)
 
+
+        debug_config=ET.Element('parameterset',attrib={'name':'pathd'})
+        debug_path = ET.SubElement(debug_config,'parameter',attrib={'name': 'work_path'})
+        benchmark.insert(3,debug_config)
+        debug_path.text="$jube_wp_abspath"
+
+        debug_result=ET.Element('result')
+        debug_result_use = ET.SubElement(debug_result,'use')
+        debug_result_use.text="analyse"
+        debug_result_path = ET.SubElement(debug_result,'table',attrib={'name': 'paths' , 'style': 'csv'})
+        debug_result_text = ET.SubElement(debug_result_path,'column')
+        debug_result_text.text="work_path"
+        benchmark.insert(len(benchmark.getchildren()),debug_result)
         for protocol in bench_config.keys():
           # add another level
 
@@ -286,6 +304,21 @@ class JubeXMLParser():
           use = ET.Element('use')
           use.text = name
           if name not in present_params:
+            step[0].insert(0,use)
+
+      if benchmark is None:
+        step = b_xml.findall("step[@name='execute']")
+      else:
+        step = benchmark.findall("step[@name='execute']")
+
+      if step: # not empty
+        present_params = []
+        for use in step[0].findall("use"):
+          present_params.append(use.text)
+        name = "pathd"
+        use = ET.Element('use')
+        use.text = name
+        if name not in present_params:
             step[0].insert(0,use)
 
 
