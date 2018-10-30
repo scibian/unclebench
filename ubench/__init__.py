@@ -16,3 +16,8 @@
 #  along with UncleBench.  If not, see <http://www.gnu.org/licenses/>.       #
 #                                                                            #
 ##############################################################################
+
+from ._version import get_version
+
+def __version__():
+    return get_version()

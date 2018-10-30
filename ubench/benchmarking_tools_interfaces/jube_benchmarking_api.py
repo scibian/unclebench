@@ -27,7 +27,7 @@ import benchmarking_api as bapi
 import time
 import csv
 import ubench.core.ubench_config as uconfig
-import ubench.data_store.data_store_yaml as data_store
+import ubench.data_management.data_store_yaml as data_store_yaml
 import jube_xml_parser
 import tempfile
 
@@ -57,7 +57,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     self.jube_xml_files.load_platform_xml(platform_name)
     self.jube_const_params = {}
 
-  def analyse_benchmark(self,benchmark_id):
+  def analyse(self,benchmark_id):
     """ Analyze benchmark results
     :param benchmark_id: id of the benchmark to be analyzed
     :type benchmark_id: int
@@ -88,13 +88,13 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
     return benchmark_results_path
 
 
-  def analyse_last_benchmark(self):
+  def analyse_last(self):
         """ Get last result from a jube benchmark.
         :returns: result directory absolute path, None if analysis failed.
         :rtype: str
         """
         try:
-            return self.analyse_benchmark('last')
+            return self.analyse('last')
         except Exception:
             raise
 
@@ -253,6 +253,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
           # we add the part of results which corresponds to a given execute
           with open(result_file_path) as csvfile:
             reader = csv.DictReader(csvfile)
+          
             field_names= reader.fieldnames
             common_fields = list(set(value.keys()) & set(field_names))
             result_fields = list(set(field_names) - set(common_fields))
@@ -270,13 +271,14 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
               if add_to_results:
                 for field in result_fields:
                   temp_hash[field].append(row[field])
-
+                  
             # when there is just value we transform the array in one value
             for field in result_fields:
+              
               if len(temp_hash[field]) == 1:
                 temp_hash[field] = temp_hash[field][0]
-
-
+                
+                
             results[key]['results_bench'] = temp_hash
             results[key]['context_fields'] = common_fields
 
@@ -313,12 +315,12 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
           metadata[field[0].strip()] = field[1].strip()
 
 
-        bench_data = data_store.DataStoreYAML(metadata,results)
-        bench_data.write(os.path.join(benchmark_rundir,'bench_results.yaml'))
+        bench_data = data_store_yaml.DataStoreYAML()
+        bench_data.write(metadata,results,os.path.join(benchmark_rundir,'bench_results.yaml'))
 
 
 
-  def extract_result_from_benchmark(self,benchmark_id):
+  def extract_results(self,benchmark_id):
         """ Get result from a jube benchmark with its id and build a python result array
         :param benchmark_id: id of the benchmark
         :type benchmark_id:int
@@ -351,18 +353,19 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
 
         # Get job errlog and outlog filenames from configuration.xml file
         cvsfile = self.jube_xml_files.get_result_cvsfile()
-
-        input_str='jube result ./'+output_dir+' --id '+benchmark_id+' -o '+cvsfile
+        debugfile = "paths"
+       
+        input_str='jube result ./'+output_dir+' --id '+benchmark_id +' -o '+ cvsfile + ' ' + debugfile 
         result_from_jube = Popen(input_str,cwd=os.getcwd(),shell=True, stdout=PIPE)
         ret_code = result_from_jube.wait()
         result_array=[]
         # Get data from result array
         empty=True
-
         with open(os.path.join(benchmark_rundir,'result/ubench_results.dat'),'w') as result_file:
+          
           for line in result_from_jube.stdout:
             result_file.write(line)
-
+           
             empty=False
 
             splitted_line=[]
@@ -380,17 +383,15 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
 
             if len(line.strip()) > 0:
                 result_array.append(splitted_line)
-
         if (empty):
             raise IOError
-
-
         # Restore working directory
         os.chdir(old_path)
+        
         return result_array
 
 
-  def extract_result_from_last_benchmark(self):
+  def extract_results_last(self):
         """ Get result from the last execution of a benchmark
         :param benchmark_id: id of the benchmark
         :type benchmark_id:int
@@ -398,12 +399,12 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         :rtype:str
         """
         try:
-            return self.extract_result_from_benchmark('last')
+            return self.extract_result('last')
         except IOError:
             raise
 
 
-  def run_benchmark(self,platform):
+  def run(self,platform):
         """ Run benchmark on a given platform and return the benchmark run directory path
         and a benchmark ID.
         :param platform: name of the platform used to configure the benchmark options relative
@@ -422,7 +423,7 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         self.jube_xml_files.write_platform_xml()
         platform_dir = self.jube_xml_files.get_platform_dir()
 
-        old_run_dir=self.analyse_last_benchmark()
+        old_run_dir=self.analyse_last()
 
         input_str='jube run --hide-animation '+self.benchmark_name+'.xml --tag '+platform+' > /dev/null &'
         my_env = os.environ
@@ -430,13 +431,13 @@ class JubeBenchmarkingAPI(bapi.BenchmarkingAPI):
         p=Popen(input_str,cwd=os.getcwd(),shell=True,env=my_env)
 
         # Get the run directory without waiting for jube run command to finish
-        run_dir = self.analyse_last_benchmark()
+        run_dir = self.analyse_last()
         timeout_counter=0
         time.sleep(2) # waiting for the directory to be created
         while (run_dir == old_run_dir) :
             time.sleep(1) # wait to avoid spamming
             timeout_counter+=1
-            run_dir=self.analyse_last_benchmark()
+            run_dir=self.analyse_last()
             if (timeout_counter>10):
               raise RuntimeError('Jube parsing might have gone wrong, please check '+
                                  self.benchmark_path+'/jube-parse.log file')
