@@ -1,0 +1,32 @@
+= {{title}}
+
+{{author}}
+{{version}}
+
+:toc: macro
+:toc-placement: macro
+:numbered:
+
+{{introduction}}
+
+toc::[]
+
+{% for benchmark in benchmarks %}
+== {{benchmark}}
+{% for session in sessions %}
+=== {{session}}
+
+include::{{report_files[session][benchmark]}}[]
+
+{% endfor %}
+
+{% if 'compare' in report_files %}
+{% if benchmark in report_files['compare'] %}
+=== Comparison
+
+include::{{report_files['compare'][benchmark]}}[]
+{% endif %}
+
+{% endif %}
+
+{% endfor %}

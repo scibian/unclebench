@@ -1,27 +1,27 @@
-== {{title}}
+* tester: {{tester}}
+* date start: {{date_start}}
+* date end: {{date_end}}
+* platform: {{platform}}
+* result: {{result}}
+* comment: {{comment}}
+* command(s) used:
 
-{{description}}
+{% for cmd in cmdline -%}
+** {{cmd}}
+{% endfor %}
 
-{# Print result_array#}
-{% if result_array %}
-[options="header"]
+
+{# Print performance arrays #}
+
+{% for perf_array, sub_bench in perf_array_list -%}
+
+.{{sub_bench}} results
+[cols={{ncols}}, options="header"]
 |===
-  {% for row in result_array -%}
+  {% for row in perf_array -%}
     {% for elem in row -%}
-|  {{elem}} 
+|  {{elem}}
     {%- endfor %}
   {% endfor %}
 |===
-{% endif %}
-
-
-{# Print images #}
-{% if plot_list %}
-  {% for image_title,legend,image_filename in plot_list %}
-[discrete]
-=== {{image_title}}
-[[{{image_filename}}]]
-.{{legend}}
-image::{{image_filename}}[]
-  {% endfor %}
-{% endif %}
+{% endfor %}

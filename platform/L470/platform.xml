@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jube>
-    <!-- Default Zbook15 Sets -->
+    <!-- Default L470 Sets -->
 
     <parameterset name="system_parameters" init_with="bash.xml"/>
     <substituteset name="execute_sub" init_with="bash.xml"/>
@@ -47,7 +47,7 @@
     <parameterset name="mpi_set">
 	<parameter name="mpi_v">0</parameter>
 	<parameter name="mpi_version" mode="python">
-	    ["OpenMPI-1.6.5"][$mpi_v]
+	    ["OpenMPI-2.0.2"][$mpi_v]
 	</parameter>
 	<parameter name="mpi_root" mode="python">
 	    ["/usr/lib/openmpi/"][$mpi_v]
@@ -67,19 +67,19 @@
 	</parameter>
 	
 	<parameter name="binding_full_node" separator="??">
-	  -n $tasks
+	  -n $tasks --bind-to core
 	</parameter>
 	
 	<parameter name="binding_hybrid" mode="python" separator="??">
-	  ["--mca rmaps_base_schedule_policy slot --bind-to-core -cpus-per-rank 2 -num-sockets 1 --npersocket 2 -n $tasks"][$mpi_v]
+	  ["--bind-to core --map-by ppr:1:socket:PE=2 -n $tasks"][$mpi_v]
 	</parameter>
     
 	<parameter name="binding_half_node" mode="python" separator="??">
-	  ["--mca rmaps_base_schedule_policy slot --bind-to-core -cpus-per-rank 2 -num-sockets 1 --npersocket 2 -n $tasks"][$mpi_v]
+	  ["--bind-to core --map-by ppr:1:socket:PE=2 -n $tasks"][$mpi_v]
 	</parameter>
     
 	<parameter name="binding_stream" mode="python" separator="??">
-	  ["--mca rmaps_base_schedule_policy slot --bind-to-core -cpus-per-rank 4 -num-sockets 1 --npersocket 1 -n $tasks"][$mpi_v]
+	  ["--bind-to core --map-by ppr:1:socket:PE=2 -n $tasks"][$mpi_v]
 	</parameter>
 
     </parameterset>
@@ -98,12 +98,12 @@
 
 
     <parameterset name="cluster_specs">
-	<parameter name="platform_name" type="string">Zbook15</parameter>
+	<parameter name="platform_name" type="string">L470</parameter>
         <parameter name="GB_per_node" type="int">16</parameter>
-	<parameter name="MB_LLC_size" type="float">6</parameter>
+	<parameter name="MB_LLC_size" type="float">3</parameter>
 	<parameter name="LLC_cache_line_size" type="int">64</parameter>
 	<parameter name="NUMA_regions" type="int">1</parameter>
-	<parameter name="cores_per_NUMA_region" type="int">4</parameter>
+	<parameter name="cores_per_NUMA_region" type="int">2</parameter>
     </parameterset>
 
 </jube>

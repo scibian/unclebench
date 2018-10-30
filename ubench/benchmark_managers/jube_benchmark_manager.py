@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ##############################################################################
 #  This file is part of the UncleBench benchmarking tool.                    #
@@ -17,30 +18,23 @@
 #  along with UncleBench.  If not, see <http://www.gnu.org/licenses/>.       #
 #                                                                            #
 ##############################################################################
+"""
+Define JubeBenchmarkManager class.
+"""
+import ubench.benchmarking_tools_interfaces.jube_benchmarking_api as jba
+import ubench.benchmark_managers.standard_benchmark_manager as stdbm
 
-import data_store
-import yaml
+class JubeBenchmarkManager(stdbm.StandardBenchmarkManager):
+    """
+    Concrete class defining an interface to run jube benchmarks and
+    manage their results.
+    """
+    def __init__(self, benchmark_name, platform, uconf):
+        self.platform = platform
+        stdbm.StandardBenchmarkManager.__init__(self,benchmark_name, platform, uconf)
 
-class DataStoreYAML(data_store.DataStore):
-
-  def __init__(self,metadata=None,runs_info=None):
-    data_store.DataStore.__init__(self,metadata,runs_info)
-
-  def write(self, output_file):
-    with open(output_file, 'w') as outfile:
-      benchdata = self.metadata
-      benchdata['runs'] = self.runs_info
-      yaml.dump(benchdata, outfile, default_flow_style=False)
-
-  def load(self,input_file):
-    with open(input_file, 'r') as inputfile:
-      try:
-        data = yaml.load(inputfile)
-        self.runs_info = data['runs']
-        data.pop('runs',None)
-        self.metadata = data
-      except Exception as e:
-        data = None
-        self.runs_info = None
-        self.metadata = None
-                                  
+    def get_benchmarking_api(self):
+        """
+        Factory method to get a new JubeBenchmarkingAPI
+        """
+        return jba.JubeBenchmarkingAPI(self.benchmark_name, self.platform)

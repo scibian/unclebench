@@ -18,17 +18,30 @@
 #  along with UncleBench.  If not, see <http://www.gnu.org/licenses/>.       #
 #                                                                            #
 ##############################################################################
+import subprocess
+import os
 
-import ubench.benchmark_managers.benchmark_manager as bm
+
+VERSION= "0.3.0"
 
 
-class LocalBenchmarkManager(bm.BenchmarkManager):
+def get_git_revision_short_hash():
+    #check if we are in a git repository
+    return None
+    # current_path = os.path.dirname(os.path.abspath(__file__))
+    # os.chdir(current_path)
+    # if subprocess.call(["git", "branch"], stderr=open(os.devnull, 'w'), stdout=open(os.devnull, 'w')) != 0:
+    #   return None
+    # else:
+    #   return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
 
-    def __init__(self,benchmark_name,platform):
-        """ Constructor """
-        bm.BenchmarkManager.__init__(self,benchmark_name,platform)
-        self.title='STREAM benchmark (v 5.10)'
-        self.description='STREAM is a memory bandwidth benchmark (https://www.cs.virginia.edu/stream/).'
-        self.print_array=False
-        self.print_transposed_array=True
-        self.print_plot=False
+
+def get_version():
+
+  version = VERSION
+  git_revision = get_git_revision_short_hash()
+
+  if git_revision:
+    version+= "-{}".format(git_revision.rstrip())
+
+  return version

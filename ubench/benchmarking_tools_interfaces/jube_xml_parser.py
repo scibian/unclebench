@@ -40,7 +40,7 @@ class JubeXMLParser():
     self.bench_xml_root = [bench_xml.getroot() for bench_xml in self.bench_xml.values()]
     self.platforms_dir = platforms_dir
     self.platform_dir = tempfile.mkdtemp()
-    self.platform_xml = ""
+    self.platform_xml = []
     self.config_xml = ""
 
   def write_bench_xml(self):
@@ -48,12 +48,14 @@ class JubeXMLParser():
       xml_file.write(os.path.join(self.bench_xml_path_out,name))
     return True
 
+  def write_platform_xml(self):
+    for name,p_xml in self.platform_xml.iteritems():
+      p_xml.write(os.path.join(self.platform_dir,name))
 
   def delete_platform_dir(self):
     shutil.rmtree(self.platform_dir)
 
   def get_platform_dir(self):
-    self.generate_platform()
     return self.platform_dir
 
   def remove_multisource(self):
@@ -64,7 +66,7 @@ class JubeXMLParser():
 
   def load_platforms_xml(self):
     self.generate_platform()
-    return ET.parse(os.path.join(self.platform_dir,"platforms.xml")).getroot()
+    return ET.parse(os.path.join(self.platform_dir,"platforms.xml"))
 
   # The file is loaded later on, when the benchmark has already been run
   def load_config_xml(self,path):
@@ -113,7 +115,6 @@ class JubeXMLParser():
           source_dict['files'] = []
           for file_source in source.findall('file'):
             source_dict['files'].append(file_source.text.strip())
-
           source_dict['do_cmds'] = []
           for do_cmd in source.findall('do'):
             source_dict['do_cmds'].append(do_cmd.text.strip())
@@ -126,7 +127,13 @@ class JubeXMLParser():
           if source.find('url') is not None:
             source_dict['url'] = source.find('url').text
             if source_dict['protocol'] == 'git':
-              source_dict['files']=[source_dict['url'].split('/')[-1].split('.')[0]]
+                files = source_dict['files']
+                # Check if there is files to add else it adds the repo's name
+                if files:
+                  source_dict['files']= files
+                  source_dict['files'].append(source_dict['url'].split('/')[-1].split('.')[0])
+                else:
+                  source_dict['files']= [source_dict['url'].split('/')[-1].split('.')[0]]
 
           multisource_data.append(source_dict)
 
@@ -188,6 +195,20 @@ class JubeXMLParser():
 
     return parameters_list
 
+  def set_params_platform(self,dict_options):
+    parameters_list=[]
+    for p_xml in self.platform_xml.values():
+      for parameter_node in p_xml.getroot().getiterator('parameter'):
+        load_param = parameter_node.get('name')
+        if  load_param in dict_options.keys():
+          parameters_list.append((load_param,
+                                  parameter_node.text.strip(),
+                                  str(dict_options[load_param])))
+          parameter_node.text=str(dict_options[load_param])
+          upd=True
+
+    return parameters_list
+
   def add_bench_input(self):
     # This method add automatically information concerning benchmark, input files obtained using the command fetch
     # bench_config is a dictionary {'svn' : {'bench_dir':["BENCH_F128_02","BENCH_F128_03"]},
@@ -213,6 +234,19 @@ class JubeXMLParser():
         link = ET.SubElement(files_element,'link',attrib={'name': benchmark_name,'rel_path_ref': 'external'})
         link.text = "$UBENCH_RESOURCE_DIR/{0}/".format(benchmark_name)
 
+
+        debug_config=ET.Element('parameterset',attrib={'name':'pathd'})
+        debug_path = ET.SubElement(debug_config,'parameter',attrib={'name': 'work_path'})
+        benchmark.insert(3,debug_config)
+        debug_path.text="$jube_wp_abspath"
+
+        debug_result=ET.Element('result')
+        debug_result_use = ET.SubElement(debug_result,'use')
+        debug_result_use.text="analyse"
+        debug_result_path = ET.SubElement(debug_result,'table',attrib={'name': 'paths' , 'style': 'csv'})
+        debug_result_text = ET.SubElement(debug_result_path,'column')
+        debug_result_text.text="work_path"
+        benchmark.insert(len(benchmark.getchildren()),debug_result)
         for protocol in bench_config.keys():
           # add another level
 
@@ -272,6 +306,21 @@ class JubeXMLParser():
           if name not in present_params:
             step[0].insert(0,use)
 
+      if benchmark is None:
+        step = b_xml.findall("step[@name='execute']")
+      else:
+        step = benchmark.findall("step[@name='execute']")
+
+      if step: # not empty
+        present_params = []
+        for use in step[0].findall("use"):
+          present_params.append(use.text)
+        name = "pathd"
+        use = ET.Element('use')
+        use.text = name
+        if name not in present_params:
+            step[0].insert(0,use)
+
 
   def add_custom_nodes_stub(self,custom_nodes_numbers,custom_nodes_ids):
     """
@@ -306,21 +355,23 @@ class JubeXMLParser():
                                                 'separator':'??'})
           custom_nodes_id.text=str(custom_nodes_ids)+'[$custom_id]'
 
-          custom_submit=ET.SubElement(custom_element,'parameter',\
-                                    attrib={'name':'custom_submit',\
-                                            'separator':'??',\
-                                            'mode':'python',\
-                                            'type':'string',\
-                                            'separator':'??'})
 
-        if custom_nodes_ids:
-          custom_submit.text='['
-          for el in custom_nodes_ids:
-            if el!=None:
-              custom_submit.text+="'$submit -w $custom_nodes_id ',"
-            else:
-              custom_submit.text+="'$submit ',"
-          custom_submit.text=custom_submit.text[:-1]+'][$custom_id]'
+          custom_sub={}
+          custom_sub_keys=["submit","submit_singleton"]
+          for ck in custom_sub_keys:
+            custom_sub[ck]=ET.SubElement(custom_element,'parameter',\
+                                         attrib={'name':'custom_'+ck,\
+                                                 'separator':'??',\
+                                                 'mode':'python',\
+                                                 'type':'string',\
+                                                 'separator':'??'})
+            custom_sub[ck].text='['
+            for el in custom_nodes_ids:
+              if el!=None:
+                custom_sub[ck].text+="'$"+ck+" -w $custom_nodes_id ',"
+              else:
+                custom_sub[ck].text+="'$"+ck+" ',"
+            custom_sub[ck].text=custom_sub[ck].text[:-1]+'][$custom_id]'
 
         p.insert(0,custom_element)
 
@@ -410,12 +461,21 @@ class JubeXMLParser():
           analyse_files.append(subnode.text.strip())
     return analyse_files
 
+  def get_result_cvsfile(self):
+    config_xml_file = self.config_xml
+    cvs_file_name = None
+    for node in config_xml_file.getiterator('table'):
+      if (node.get('style')=="csv"):
+        cvs_file_name=node.get("name")
+        return cvs_file_name
+
+
   def get_dirs(self,dir_path):
     return [d for d in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, d))]
 
   def generate_platform(self):
+    # generate a file with all platform paths
     platform_dir = self.platforms_dir
-
     template_xml = ET.parse(os.path.join(platform_dir,"template.xml")) # This contain the file platform.xml
     platform_directories = self.get_dirs(platform_dir)
     include_dir = template_xml.getroot().find("include-path")
@@ -447,21 +507,30 @@ class JubeXMLParser():
   def load_platform_xml(self,platform_name):
     platforms_xml = self.load_platforms_xml()
     path_raw = ""
-    path_platform_xml = None
-    for path in platforms_xml.iter('path'):
+    paths_platform_xml = {}
+    for path in platforms_xml.getroot().iter('path'):
       if path.get('tag') == platform_name:
         path_raw = path.text
-        for filetype in ["platform.xml","nodetype.xml"]:
-          file = os.popen("echo "+os.path.join(path_raw,filetype)).read().strip()
-          if os.path.exists(file):
-            path_platform_xml = file
+        platform_path = os.path.join(path_raw,"platform.xml")
+        nodetype_path = os.path.join(path_raw,"nodetype.xml")
 
-    if path_platform_xml:
-      self.platform_xml = ET.parse(path_platform_xml).getroot()
+        if os.path.exists(platform_path):
+          paths_platform_xml["platform.xml"] = ET.parse(platform_path)
+          path.text = self.platform_dir
+        elif os.path.exists(nodetype_path):
+          platform_updir = os.path.dirname(path_raw)
+          path.text = self.platform_dir
+          paths_platform_xml["nodetype.xml"] = ET.parse(nodetype_path)
+          paths_platform_xml["platform.xml"] = ET.parse(os.path.join(platform_updir,"platform.xml"))
 
-  def get_params_platform(self):
+    self.platform_xml = paths_platform_xml
+    platforms_xml.write(os.path.join(self.platform_dir,"platforms.xml"))
+
+  def get_params_platform(self,platform_name):
     parameters_list=[]
-    for parameter_node in self.platform_xml.getiterator('parameter'):
-      if parameter_node.text:
-        parameters_list.append((parameter_node.get('name'),parameter_node.text.strip()))
+    self.load_platform_xml(platform_name)
+    for platform_xml in self.platform_xml.values():
+      for parameter_node in platform_xml.getiterator('parameter'):
+        if parameter_node.text:
+          parameters_list.append((parameter_node.get('name'),parameter_node.text.strip()))
     return parameters_list
