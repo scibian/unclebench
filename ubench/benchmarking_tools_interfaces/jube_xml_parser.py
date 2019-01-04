@@ -18,7 +18,8 @@
 ##############################################################################
 
 
-import xml.etree.ElementTree as ET
+#import xml.etree.ElementTree as ET
+import lxml.etree as ET
 import os
 import re
 import tempfile
@@ -36,7 +37,8 @@ class JubeXMLParser():
     self.bench_xml_path_out = bench_xml_path_out # string
     self.bench_xml_files = bench_xml_files
     # I have to do a tuple here
-    self.bench_xml = { xml_file : ET.parse(os.path.join(self.bench_xml_path_in,xml_file))  for xml_file in bench_xml_files}
+    parser = ET.XMLParser(remove_blank_text = True)
+    self.bench_xml = { xml_file : ET.parse(os.path.join(self.bench_xml_path_in,xml_file),parser)  for xml_file in bench_xml_files}
     self.bench_xml_root = [bench_xml.getroot() for bench_xml in self.bench_xml.values()]
     self.platforms_dir = platforms_dir
     self.platform_dir = tempfile.mkdtemp()
@@ -45,7 +47,7 @@ class JubeXMLParser():
 
   def write_bench_xml(self):
     for name,xml_file in self.bench_xml.iteritems():
-      xml_file.write(os.path.join(self.bench_xml_path_out,name))
+      xml_file.write(os.path.join(self.bench_xml_path_out,name),pretty_print=True)
     return True
 
   def write_platform_xml(self):
@@ -102,6 +104,63 @@ class JubeXMLParser():
 
     return steps
 
+  def get_analyzer_names(self):
+    analyzer_names = []
+    for b_xml in self.bench_xml_root:
+      bench_root = b_xml.find('benchmark')
+
+      if bench_root is not None:
+        analyzer_names+=[analyz.get('name') for analyz in bench_root.findall('analyzer')]
+      else:
+        analyzer_names+=[analyz.get('name') for analyz in b_xml.findall('analyzer')]
+
+    if not analyzer_names:
+      analyzer_names.append("")
+
+    return list(set(analyzer_names))
+
+  def get_bench_parameterset(self):
+    parameterset=[]
+    for b_xml in self.bench_xml_root:
+     # either is on inside tag jube or tag benchmark
+      bench_root = b_xml.find('benchmark')
+
+      if bench_root is None:
+        bench_root = b_xml
+
+      parameterset+=[parameterset.get('name') for parameterset in bench_root.findall('parameterset')]
+
+    return parameterset
+
+  def get_bench_substituteset(self):
+    substituteset=[]
+    for b_xml in self.bench_xml_root:
+      # either is on inside tag jube or tag benchmark
+      bench_root = b_xml.find('benchmark')
+      if bench_root is None:
+        bench_root = b_xml
+
+      for element in bench_root.findall('substituteset'):
+        # We add all substituteset except the one that contains the  init_with="platform.xml"
+        if element.get('init_with') != "platform.xml":
+          substituteset.append(element.get('name'))
+
+    return substituteset
+
+  def get_bench_fileset(self):
+    fileset=[]
+    for b_xml in self.bench_xml_root:
+      # either is on inside tag jube or tag benchmark
+      bench_root = b_xml.find('benchmark')
+
+      if bench_root is None:
+        bench_root = b_xml
+
+      fileset+=[fileset.get('name') for fileset in bench_root.findall('fileset')]
+
+    return fileset
+
+
   def get_bench_multisource(self):
     multisource_data = [] # [{'protocol': 'https'}, {'files' : ['file1','file2','file3']}, {'url': "http://ifjiaf"}, {'name' : "fa"}]
     for b_xml in self.bench_xml_root:
@@ -123,6 +182,12 @@ class JubeXMLParser():
             source_dict['revision'] = []
             for revision_source in source.findall('revision'):
               source_dict['revision'].append(revision_source.text.strip())
+
+          if source.find('branch') is not None:
+            source_dict['branch'] = []
+            for revision_source in source.findall('branch'):
+              source_dict['branch'] = revision_source.text.strip()
+
 
           if source.find('url') is not None:
             source_dict['url'] = source.find('url').text
@@ -172,7 +237,7 @@ class JubeXMLParser():
 
   def get_params_bench(self):
     # include variable of multisource
-    self.add_bench_input()
+    self.add_bench_input(dict_options=None)
     parameters_list=[]
     for b_xml in self.bench_xml_root:
       for parameter_node in b_xml.getiterator('parameter'):
@@ -181,7 +246,7 @@ class JubeXMLParser():
 
   def set_params_bench(self,dict_options):
     # include variable of multisource
-    self.add_bench_input()
+    self.add_bench_input(dict_options)
     parameters_list=[]
     for b_xml in self.bench_xml_root:
       for parameter_node in b_xml.getiterator('parameter'):
@@ -209,7 +274,73 @@ class JubeXMLParser():
 
     return parameters_list
 
-  def add_bench_input(self):
+
+  def set_bench_execution(self):
+    # we perform the necessary modifications in the xml file to active only the execute step
+
+    # Get all steps
+    for b_xml in self.bench_xml_root:
+      # either is on inside tag jube or tag benchmark
+      bench_root = b_xml.find('benchmark')
+
+      if bench_root is None:
+        bench_root = b_xml
+
+      for step in bench_root.findall('step'):
+        if step.get('name') != "execute" and step.get('depend') !="execute":
+          step.set('tag','noexecute')
+        else:
+          step.set('tag','!noexecute')
+          if step.get('name') == "execute":
+            step.attrib.pop('depend')
+            for use_tag in step.findall('use'):
+              if use_tag.text.strip() in self.get_bench_substituteset() + self.get_bench_fileset():
+                step.remove(use_tag)
+
+      # We look for a fileset benchfiles and we add to the step execute
+      # We generate a filseset for bench_files
+      file_bench_element = None
+
+      index_insert = -1
+      for idx,element in enumerate(bench_root):
+        if element.get('name') == 'bench_files':
+          # we insert a filset with the content of bench_files
+          file_bench_element=ET.Element('fileset',attrib={'name':'bench_files_links'})
+          for parameter in element.findall('parameter'):
+            if os.path.isfile(parameter.text):
+              link = ET.SubElement(file_bench_element,'link')
+              link.text = parameter.text
+              index_insert=idx
+
+          break
+
+      if index_insert>0:
+        bench_root.insert(index_insert,file_bench_element)
+
+      if 'bench_files' in self.get_bench_parameterset():
+        step_execute = bench_root.findall("step[@name='execute']")
+
+        if step_execute: # not empty
+          present_params = []
+          use = ET.Element('use')
+          use.text = "bench_files_links"
+          step_execute[0].insert(0,use)
+          # remove bench config
+          for element in step_execute[0].findall('use'):
+            if element.text =="bench_config":
+              step_execute.remove(element)
+              break
+
+      # We treat the case when we include other files
+      # we remove external dependences as its always compile step
+      include_tags = bench_root.findall('include')
+      if include_tags:
+        for element in include_tags:
+          if ((element.get('from')) not in self.bench_xml_files) and ((element.get('path')=="step")):
+            bench_root.remove(element)
+
+
+  def add_bench_input(self,dict_options=None):
     # This method add automatically information concerning benchmark, input files obtained using the command fetch
     # bench_config is a dictionary {'svn' : {'bench_dir':["BENCH_F128_02","BENCH_F128_03"]},
     #                              {'http': {'code_sour' : faofaj}
@@ -240,13 +371,26 @@ class JubeXMLParser():
         benchmark.insert(3,debug_config)
         debug_path.text="$jube_wp_abspath"
 
+        exec_config=ET.Element('parameterset',attrib={'name':'bench_files'})
+        if dict_options:
+          for opt in dict_options:
+          
+            exec_val   = ET.SubElement(exec_config,'parameter',attrib={'name': opt})
+            exec_val.text= dict_options[opt]
+          benchmark.insert(4,exec_config)
+        
+        
+        
         debug_result=ET.Element('result')
         debug_result_use = ET.SubElement(debug_result,'use')
-        debug_result_use.text="analyse"
+        # TODO: handle multiple analyzer
+        debug_result_use.text = self.get_analyzer_names()[0]
         debug_result_path = ET.SubElement(debug_result,'table',attrib={'name': 'paths' , 'style': 'csv'})
         debug_result_text = ET.SubElement(debug_result_path,'column')
         debug_result_text.text="work_path"
+
         benchmark.insert(len(benchmark.getchildren()),debug_result)
+
         for protocol in bench_config.keys():
           # add another level
 
@@ -303,7 +447,7 @@ class JubeXMLParser():
         for name in ["ubench_config","ubench_files"]:
           use = ET.Element('use')
           use.text = name
-          if name not in present_params:
+          if name not in present_params and "bench_files_links" not in present_params:
             step[0].insert(0,use)
 
       if benchmark is None:
@@ -321,7 +465,22 @@ class JubeXMLParser():
         if name not in present_params:
             step[0].insert(0,use)
 
-
+        for use in step[0].findall("use"):
+          present_params.append(use.text)
+          name = "compiler_set"
+          use = ET.Element('use', attrib={'from': 'platform.xml'})
+          use.text = name
+        if name not in present_params:
+          step[0].insert(0,use)
+            
+        for use in step[0].findall("use"):
+          present_params.append(use.text)
+          name = "mpi_set"
+          use = ET.Element('use', attrib={'from': 'platform.xml'})
+          use.text = name
+        if name not in present_params:
+          step[0].insert(0,use)
+                                              
   def add_custom_nodes_stub(self,custom_nodes_numbers,custom_nodes_ids):
     """
     Comment TODO
@@ -442,6 +601,7 @@ class JubeXMLParser():
         if not element_name or el.get('name')==element_name:
           if re.findall(pattern,el.text):
             el.text=re.sub(pattern,new_text,el.text)
+
 
   def get_job_logfiles(self):
     config_xml_file = self.config_xml

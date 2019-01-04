@@ -4,7 +4,8 @@ import mock
 import pytest_mock
 import tempbench
 import os
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
+
 import ubench.benchmarking_tools_interfaces.jube_benchmarking_api as jba
 import ubench.benchmarking_tools_interfaces.jube_xml_parser as j_xml
 import ubench.core.fetcher as fetcher
@@ -216,10 +217,10 @@ def test_run_customp(monkeypatch,init_env):
       raise NameError('param error')
     return True
 
-  def mock_bm_run_bench(self,platform,wklist,raw_cli):
+  def mock_bm_run_bench(self,platform,opt_dict):
     return True
 
   monkeypatch.setattr("ubench.benchmark_managers.standard_benchmark_manager.StandardBenchmarkManager.set_parameter",mock_bm_set_param)
   monkeypatch.setattr("ubench.benchmark_managers.standard_benchmark_manager.StandardBenchmarkManager.run",mock_bm_run_bench)
   ubench_cmd = ubench_commands.UbenchCmd("",["simple"])
-  ubench_cmd.run(['host1'],["param:new_value","argexec:'PingPong -npmin 56 msglog 1:18'"])
+  ubench_cmd.run({'customp_list': ["param:new_value","argexec:'PingPong -npmin 56 msglog 1:18'"],'w_list' : "host1"})
