@@ -1,8 +1,21 @@
-unclebench (1:0.3.0-0sci9u1) scibian9; urgency=medium
+unclebench (1:0.3.1-0sci9u1) scibian9; urgency=medium
 
-  * New Debian release 1:0.3.0-0sci9u1
+  * New Debian release 1:0.3.1-0sci9u1
 
- -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Tue, 30 Oct 2018 14:06:24 +0100
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Fri, 04 Jan 2019 17:59:12 +0100
+
+unclebench (1:0.3.1-0sci8u1) scibian8; urgency=medium
+
+  * New upstream version 0.3.1
+
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Fri, 04 Jan 2019 17:52:50 +0100
+
+unclebench (1:0.3.0-0sci8u1) scibian8; urgency=medium
+
+  * New upstream version 0.3.0
+  * Remove plugin package that was remove from upstream version
+
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Tue, 30 Oct 2018 11:39:29 +0100
 
 unclebench (1:0.2.3-0sci8u1) scibian8; urgency=medium
 
