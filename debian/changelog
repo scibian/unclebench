@@ -1,3 +1,9 @@
+unclebench (1:0.3.1-0sci9u2) scibian9; urgency=medium
+
+  * Add L470 platform to installed files
+
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Mon, 07 Jan 2019 11:17:22 +0100
+
 unclebench (1:0.3.1-0sci9u1) scibian9; urgency=medium
 
   * New Debian release 1:0.3.1-0sci9u1
