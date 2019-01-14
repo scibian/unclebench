@@ -1,14 +1,14 @@
-unclebench (1:0.3.1-0sci9u2) scibian9; urgency=medium
+unclebench (1:0.3.2-0sci9u1) scibian9; urgency=medium
 
-  * Add L470 platform to installed files
+  * New Debian release 1:0.3.2-0sci9u1
 
- -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Mon, 07 Jan 2019 11:17:22 +0100
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Mon, 14 Jan 2019 09:55:37 +0100
 
-unclebench (1:0.3.1-0sci9u1) scibian9; urgency=medium
+unclebench (1:0.3.2-0sci8u1) scibian8; urgency=medium
 
-  * New Debian release 1:0.3.1-0sci9u1
+  * New upstream version 0.3.2
 
- -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Fri, 04 Jan 2019 17:59:12 +0100
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Fri, 11 Jan 2019 17:39:57 +0100
 
 unclebench (1:0.3.1-0sci8u1) scibian8; urgency=medium
 
