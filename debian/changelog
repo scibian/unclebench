@@ -1,8 +1,14 @@
-unclebench (1:0.3.2-0sci9u1) scibian9; urgency=medium
+unclebench (1:0.3.3-0sci9u1) scibian9; urgency=medium
 
-  * New Debian release 1:0.3.2-0sci9u1
+  * New Debian release 1:0.3.3-0sci9u1
 
- -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Mon, 14 Jan 2019 09:55:37 +0100
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Wed, 16 Jan 2019 16:25:37 +0100
+
+unclebench (1:0.3.3-0sci8u1) scibian8; urgency=medium
+
+  * New upstream version 0.3.3
+
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Wed, 16 Jan 2019 16:21:41 +0100
 
 unclebench (1:0.3.2-0sci8u1) scibian8; urgency=medium
 
