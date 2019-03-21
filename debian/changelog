@@ -1,3 +1,9 @@
+unclebench (1:0.3.4-0sci9u2) scibian9; urgency=medium
+
+  * Add missing python-lxml dependency
+
+ -- Pierre Trespeuch <pierre-externe.trespeuch@edf.fr>  Thu, 21 Mar 2019 15:15:04 +0100
+
 unclebench (1:0.3.4-0sci9u1) scibian9; urgency=medium
 
   * New release 1:0.3.4-0sci9u1
