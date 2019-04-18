@@ -3,3 +3,4 @@ templates usr/share/unclebench
 platform/template.xml usr/share/unclebench/platform/
 usr/bin/
 usr/lib
+configuration/ubench.conf etc/unclebench

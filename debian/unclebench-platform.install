@@ -1,4 +1,3 @@
 platform/Zbook15 /usr/share/unclebench/platform/
-platform/L470 /usr/share/unclebench/platform/
 platform/bash.xml /usr/share/unclebench/platform/
 platform/submit-local.job.in /usr/share/unclebench/platform/
