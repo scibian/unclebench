@@ -23,6 +23,7 @@ import getpass
 import os
 import xml.etree.ElementTree as ET
 import ubench.benchmarking_tools_interfaces.jube_xml_parser as jube_xml_parser
+import pwd
 
 # used to read ubench.conf ;
 # In Python 3, ConfigParser has been renamed
@@ -99,7 +100,7 @@ class UbenchConfig:
         """ Init path with LOCAL settings """
         
         config = configparser.ConfigParser()
-        f = config.read(u'/home/' + getpass.getuser() + '/.unclebench/ubench.conf')
+        f = config.read(u'' + pwd.getpwuid(os.getuid()).pw_dir + '/.unclebench/ubench.conf')
         if len(f) > 0:
             self.load_config(config, origin)
 
@@ -127,7 +128,7 @@ class UbenchConfig:
         self.settings_source['UBENCH_BENCHMARK_DIR'] = {'origin' : origin, 'val' : self.benchmark_dir}
         #os.environ['UBENCH_BENCHMARK_DIR']=self.benchmark_dir
         
-        self.conf_dir='/etc/unclebench/' 
+        self.conf_dir='/etc/unclebench' 
         self.settings_source['UBENCH_CONF_DIR'] = {'origin' : origin, 'val' : self.conf_dir}
         self.stylesheet_path='/usr/share/unclebench/css/asciidoctor-bench-report.css'
         self.settings_source['UBENCH_CSS_PATH'] = {'origin' : origin, 'val' : self.stylesheet_path}
@@ -135,9 +136,16 @@ class UbenchConfig:
         self.settings_source['UBENCH_TEMPLATES_PATH'] = {'origin' : origin, 'val' : self.templates_path}
 
         # Working directories
-        self.run_dir='/scratch/'+getpass.getuser()+'/ubench/benchmarks'
-        self.settings_source['UBENCH_RUN_DIR'] = {'origin' : origin, 'val' : self.run_dir}
-        self.resource_dir='/scratch/'+getpass.getuser()+'/ubench/resource'
+        if os.environ.get('SCRATCHDIR') is None:
+            self.run_dir=pwd.getpwuid(os.getuid()).pw_dir + '/ubench/benchmarks'
+        else:
+            self.run_dir=os.environ.get('SCRATCHDIR') + '/ubench/benchmarks'
+        self.settings_source['UBENCH_RUN_DIR_BENCH'] = {'origin' : origin, 'val' : self.run_dir}
+
+        if os.environ.get('SCRATCHDIR') is None:
+            self.resource_dir=pwd.getpwuid(os.getuid()).pw_dir + '/ubench/resource'
+        else:
+            self.resource_dir=os.environ.get('SCRATCHDIR') + '/ubench/resource'
         self.settings_source['UBENCH_RESOURCE_DIR'] = {'origin' : origin, 'val' : self.resource_dir}
         #os.environ['UBENCH_RESOURCE_DIR']=self.resource_dir
         
