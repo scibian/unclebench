@@ -1,3 +1,9 @@
+unclebench (1:0.3.7-0sci9u1) scibian9; urgency=medium
+
+  * New Scibian release 1:0.3.7-0sci9u1
+
+ -- Eduardo Rothe <eduardo-externe.rothe@edf.fr>  Mon, 06 May 2019 11:06:28 +0200
+
 unclebench (1:0.3.6-0sci9u1) scibian9; urgency=medium
 
   * New Scibian release 1:0.3.6-0sci9u1
