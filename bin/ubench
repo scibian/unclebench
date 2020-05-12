@@ -11,195 +11,335 @@
 #                                                                            #
 #  UncleBench is distributed in the hope that it will be useful,             #
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of            #
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the              #
 #  GNU General Public License for more details.                              #
 #                                                                            #
 #  You should have received a copy of the GNU General Public License         #
-#  along with UncleBench.  If not, see <http://www.gnu.org/licenses/>.       #
+#  along with UncleBench. If not, see <http://www.gnu.org/licenses/>.        #
 #                                                                            #
 ##############################################################################
 # pylint: disable=invalid-name
-"""
-Unclebench main script
-"""
+""" Unclebench main script """
 
 import os
 import sys
 import argparse
 import socket
-import ubench.core.ubench_commands as ubench_commands
-import ubench.core.ubench_config as uconfig
-from ubench.release import __version__
+
+import ubench.core.ubench_commands as ubench_commands  # pylint: disable=no-name-in-module
+import ubench.core.ubench_config as uconfig  # pylint: disable=no-name-in-module
+from ubench.release import __version__  # pylint: disable=no-name-in-module
 
 os.environ['JUBE_EXEC_SHELL'] = '/bin/bash'
-
-# Set all default path
-uconf = uconfig.UbenchConfig()
-
+uconf = uconfig.UbenchConfig()  # Set default paths for all directories
 platform_list = uconf.get_platform_list()
 benchmark_list = uconf.get_benchmark_list()
-
 default_platform = None
 platform_required = True
 
 for platform_name in platform_list:
+    # This if statement will never be true unless ubench
+    # is executed from node called gacn, eogn, etc.
     if platform_name in socket.gethostname().lower():
+        print "I've run!!"
         default_platform = platform_name
         platform_required = False
 
 # Build an argparse with a subparse for each main ubench option
-parser = argparse.ArgumentParser(description='Unclebench benchmarking and reporting tool.', \
+parser = argparse.ArgumentParser(description='Unclebench benchmarking and reporting tool.',
                                  formatter_class=argparse.RawTextHelpFormatter)
 
-parser.add_argument('-v','--version', action='version', version='%(prog)s {version}'.format(version=__version__))
+parser.add_argument('-v',
+                    '--version',
+                    action='version',
+                    version='%(prog)s {version}'.format(version=__version__))
 
 subparsers = parser.add_subparsers(dest='subparser_name')
 
-## parser for fetch
+# Parser for fetch
+fetch_help = ('Downloads benchmark sources and test cases'
+              ' from benchmark defined location to /scratch/<user>/Ubench/resource'
+              ' (customizable with UBENCH_RESOURCE_DIR environment variable).')
 
-fetch_help = 'Download benchmarks sources and test cases '+\
-    'from benchmark defined location to /scratch/<user>/Ubench/resource '+\
-    '(customizable with UBENCH_RESOURCE_DIR environment variable).'
+parser_fetch = subparsers.add_parser('fetch',
+                                     help=fetch_help)
 
-parser_fetch = subparsers.add_parser('fetch', help=fetch_help)
+parser_fetch.add_argument('-b',
+                          help=('Benchmarks to fetch. Benchmark definition'
+                                ' files should be located in /usr/share/unclebench/benchmarks/'
+                                ' (can be custumosized with UBENCH_BENCHMARK_DIR environment'
+                                ' variable)'),
+                          nargs='+',
+                          choices=benchmark_list,
+                          required=True)
 
-parser_fetch.add_argument('-b', help='Benchmarks to fetch. Benchmark definition '+\
-                          'files should be located in /usr/share/unclebench/benchmarks/'+\
-                          ' (can be custumosized with UBENCH_BENCHMARK_DIR environment variable)',\
-                          nargs='+', choices=benchmark_list, required=True)
-
-# parser for run
-run_help = 'Execute benchmarks in /scratch/<user>/Ubench/benchmarks directory '+\
-           '(can be customized with UBENCH_RUN_DIR_BENCH directory)'
+# Parser for run
+run_help = ('Execute benchmarks in /scratch/<user>/Ubench/benchmarks directory '
+            '(can be customized with UBENCH_RUN_DIR_BENCH directory)')
 
 parser_run = subparsers.add_parser('run', help=run_help)
 
-parser_run.add_argument('-p', help='Name of the test platform. '+\
-                        'Platform definition files should be located '+\
-                        ' in/usr/share/unclebench/platform/'+\
-                        '(can be customized with UBENCH_PLATFORM_DIR environment variable)', \
-                        required=platform_required, \
-                        choices=platform_list, default=default_platform)
-
-parser_run.add_argument('-b', help='Benchmarks to run. '+\
-                        'Benchmark definition files should be located in'+\
-                        '/usr/share/unclebench/benchmarks/ '+\
-                        '(can be custumosized with UBENCH_BENCHMARK_DIR environment variable)', \
-                        nargs='+', required=True, choices=benchmark_list)
-
-parser_run.add_argument('-w', help='Nodes on which to run benchmarks '+\
-                        'ex: -w 4,pocn[380,431-433]. You can also launch job on all idle nodes '+\
-                        'ex: -w all4 to run a benchmark with 4 nodes jobs covering evry idle node'\
-                        , nargs='*', action='append')
-
-
-parser_run.add_argument('-c', '--custom-params', \
-                        help='Set custom parameters. ex : --custom-params mpiv:0. '+\
-                        'Use ubench listparams to know which parameters are customizable', \
-                        nargs='+', default=[])
-
-parser_run.add_argument('-f', '--file-params', \
+parser_run.add_argument('-p',
+                        help=('Name of the test platform.'
+                              ' Platform definition files should be located'
+                              ' in/usr/share/unclebench/platform/'
+                              ' (can be customized with UBENCH_PLATFORM_DIR environment variable)'),
+                        required=platform_required,
+                        choices=platform_list,
+                        default=default_platform)
+parser_run.add_argument('-b',
+                        help=('Benchmarks to run.'
+                              ' Benchmark definition files should be located in'
+                              ' /usr/share/unclebench/benchmarks/'
+                              ' (can be custumosized with UBENCH_BENCHMARK_DIR environment'
+                              ' variable)'),
+                        nargs='+',
+                        required=True,
+                        choices=benchmark_list)
+parser_run.add_argument('-w',
+                        help=('Nodes on which to run benchmarks'
+                              ' ex: -w 4,pocn[380,431-433]. You can also launch job'
+                              ' on all idle nodes'
+                              ' ex: -w all4 to run a benchmark with 4 nodes jobs covering'
+                              ' every idle node'),
+                        nargs='+')
+parser_run.add_argument('-c',
+                        '--custom-params',
+                        help=('Set custom parameters. ex : --custom-params mpiv:0.'
+                              ' Use ubench listparams to know which parameters are customizable'),
+                        nargs='+',
+                        default=[])
+parser_run.add_argument('-f',
+                        '--file-params',
                         help='File to set custom parameters')
+parser_run.add_argument('-e',
+                        '--execute',
+                        help='Peforms only the execution step of a benchmark',
+                        default=False,
+                        action='store_true')
+parser_run.add_argument('--foreground',
+                        help='Peforms only the execution step of a benchmark',
+                        default=False,
+                        action='store_true')
 
-'custom_params_file'
-parser_run.add_argument('-e', '--execute', \
-                        help='Peforms only the execution step of a benchmark', \
-                        default=False, action='store_true')
 
+# Parser for campaign
+parser_campaign = subparsers.add_parser('campaign', help=('Run benchmark campaigns'))
+parser_campaign.add_argument('-f',
+                             '--campaign_file',
+                             help='File which describes benchmark campaign',
+                             required=True)
+parser_campaign.add_argument('-r',
+                             '--reference',
+                             help=('Result referecence: '
+                                   'either a Git tag or Git commit hash'))
+parser_campaign.add_argument('-pub', '--publish',
+                              dest='dest_dir',
+                              metavar='<directory>',
+                              required=False,
+                              help='Directory where to store the campaign result files.'
+                                   ' This directory will be created under the `results`'
+                                   ' directory located in the local benchmark repository.')
+parser_campaign.add_argument('-msg', '--message',
+                              dest='commit_msg',
+                              metavar='<commit_msg>',
+                              required=False,
+                              help='Commit message. This argument is required if the campaign'
+                                   ' is to be published.')
 
-# parser list
+# Parser for list
 list_help = 'List existing runs information for a given benchmark.'
 
-parser_list = subparsers.add_parser('list', help=list_help)
+parser_list = subparsers.add_parser('list',
+                                    help=list_help)
+parser_list.add_argument('-p',
+                         help='Name of the test platform',
+                         required=platform_required,
+                         choices=platform_list,
+                         default=default_platform)
+parser_list.add_argument('-b',
+                         help='Benchmark names list',
+                         required=True,
+                         nargs='+',
+                         choices=benchmark_list)
 
-parser_list.add_argument('-p', help='Name of the test platform', required=platform_required, \
-                                   choices=platform_list, default=default_platform)
-parser_list.add_argument('-b', help='Benchmark names list', required=True, nargs='+', \
-                                   choices=benchmark_list)
+# Parser log
+parser_log = subparsers.add_parser('log',
+                                   help='Print log of a benchmark run given its ID.')
+parser_log.add_argument('-p',
+                        help='Name of the test platform',
+                        required=platform_required,
+                        choices=platform_list,
+                        default=default_platform)
+parser_log.add_argument('-b',
+                        help='Benchmark names list',
+                        required=True,
+                        nargs='+',
+                        choices=benchmark_list)
+parser_log.add_argument('-i',
+                        help='Benchmark run IDs',
+                        nargs='+')
 
-# parser log
-parser_log = subparsers.add_parser('log', help='Print log of a benchmark run given its ID.')
-
-parser_log.add_argument('-p', help='Name of the test platform', required=platform_required, \
-                                   choices=platform_list, default=default_platform)
-parser_log.add_argument('-b', help='Benchmark names list', required=True, nargs='+', \
-                                   choices=benchmark_list)
-parser_log.add_argument('-i', help='Benchmark run IDs', nargs='+')
-
-
-# parser listparams
-parser_listparams = subparsers.add_parser('listparams', \
+# Parser listparams
+parser_listparams = subparsers.add_parser('listparams',
                                           help='List customizable parameters of a benchmark.')
-parser_listparams.add_argument('-p', help='Name of the test platform', required=platform_required, \
-                               choices=platform_list, default=default_platform)
-parser_listparams.add_argument('-b', help='Benchmark names list', required=True, nargs='+', \
+
+parser_listparams.add_argument('-p',
+                               help='Name of the test platform',
+                               required=platform_required,
+                               choices=platform_list,
+                               default=default_platform)
+parser_listparams.add_argument('-b',
+                               help='Benchmark names list',
+                               required=True,
+                               nargs='+',
                                choices=benchmark_list)
-parser_listparams.add_argument('-d', help='Print default parameters values', \
-                               default=False, action='store_true')
+parser_listparams.add_argument('-d',
+                               help='Print default parameters values',
+                               default=False,
+                               action='store_true')
 
-# parser result
-parser_result = subparsers.add_parser('result', \
-                                      help='Print raw results array from a benchmark run. '+\
-                                      'To be found benchmark runs must be located in '+\
-                                      '/sratch/<user>/Ubench/benchmarks directory but '+\
-                                      'this path can be customized with UBENCH_RUN_DIR_BENCH '+\
-                                      'environment variable')
+# Parser result
+parser_result = subparsers.add_parser('result',
+                                      help=('Print raw results array from a benchmark run.'
+                                            ' To be found benchmark runs must be located in'
+                                            ' /sratch/<user>/Ubench/benchmarks directory but'
+                                            ' this path can be customized with'
+                                            ' UBENCH_RUN_DIR_BENCH environment variable'))
 
-parser_result.add_argument('-p', help='Name of the test platform', required=platform_required, \
-                                   choices=platform_list, default=default_platform)
-parser_result.add_argument('-b', help='Benchmark names list', required=True, nargs='+', \
-                                   choices=benchmark_list)
-parser_result.add_argument('-i', help='Benchmark run IDs', nargs='+')
+parser_result.add_argument('-p',
+                           help='Name of the test platform',
+                           required=platform_required,
+                           choices=platform_list,
+                           default=default_platform)
+parser_result.add_argument('-b',
+                           help='Benchmark names list',
+                           required=True,
+                           nargs='+',
+                           choices=benchmark_list)
+parser_result.add_argument('-i',
+                           help='Benchmark run IDs',
+                           nargs='+')
 
-parser_result.add_argument('-d','--debug',help='Mode to debug Unclebench', action='store_true')
-
-# parser report
+# Parser report
 report_help = 'Build a performance report from benchmark result directories.'
 
-parser_report = subparsers.add_parser('report', help=report_help)
+parser_report = subparsers.add_parser('report',
+                                      help=report_help)
 
-parser_report.add_argument('-m','--metadata-file',help='Metadata file containing evrything needed'+\
-                           'to build the report', required=True)
-
-parser_report.add_argument('-o','--output-dir',help='Write report files in OUTPUT_DIR', \
+parser_report.add_argument('-m',
+                           '--metadata-file',
+                           help='Metadata file containing everything needed to build the report',
+                           required=True)
+parser_report.add_argument('-o',
+                           '--output-dir',
+                           help='Write report files in OUTPUT_DIR',
                            required=True)
 
-
-# parser compare
-parser_compare = subparsers.add_parser('compare', \
+# Parser compare
+parser_compare = subparsers.add_parser('compare',
                                        help='Compare results from different run directories.')
 
-parser_compare.add_argument('-i', '--input-dirs', nargs='+', \
-                            help='directories where results are to compared', required=True)
-
-parser_compare.add_argument('-b', '--benchmark-name', \
-                            help='name of the benchmark from which results are compared', required=True)
-
-parser_compare.add_argument('-c', '--context', default=None, \
-                            help='fields to use as context and should not be compared '+\
-                            'but merged in the result table', required=False, nargs='+')
-
-parser_compare.add_argument('-cc', '--compared-context', default=None, \
-                            help='field to use as context and whose value should be compared '\
-                            , required=False)
-
-parser_compare.add_argument('-t', '--threshold', default=None, \
+parser_compare.add_argument('-i',
+                            '--input-dirs',
+                            nargs='+',
+                            help='Directories where results are to compared',
+                            required=True)
+parser_compare.add_argument('-b',
+                            '--benchmark-name',
+                            help='Name of the benchmark from which results are compared',
+                            required=True)
+parser_compare.add_argument('-c',
+                            '--context',
+                            default=None,
+                            help=('Fields to use as context and should not'
+                                  ' be compared but merged in the result table'),
+                            required=False,
+                            nargs='+')
+parser_compare.add_argument('-cc',
+                            '--compared-context',
+                            default=None,
+                            help='Field to use as context and whose value should be compared',
+                            required=False)
+parser_compare.add_argument('-t',
+                            '--threshold',
+                            default=None,
                             help='Differences under given threshold will not be printed')
 
-# parser info
-parser_info = subparsers.add_parser('info', \
-                                    help='Displays path settings origin.')
+# Parser publish
+publish_help = ('Manages relation with the public repository. It can download the repository'
+                ', add or remove files, commit changes and push back to public.')
+parser_publish = subparsers.add_parser('publish', help=publish_help)
+publish_subparser = parser_publish.add_subparsers(help='Choose whether to publish a campaign or'
+                                                  'a single benchmark.', dest='command')
 
+publish_campaign = publish_subparser.add_parser('campaign')
+publish_campaign.add_argument('-c',
+                              required=True,
+                              dest='campaign_dir',
+                              metavar='<directory>',
+                              help='Name of the directory of the campaign to publish. This'
+                                   ' directory should be entered as it appears under the' 
+                                   ' benchmark run directory given by UBENCH_RUN_DIR_BENCH.')
+publish_campaign.add_argument('-d',
+                              dest='dest_dir',
+                              metavar='<directory>',
+                              required=True,
+                              help='Directory where to store the campaign result files.'
+                                   ' This directory will be created under the `results`'
+                                   ' directory located in the local benchmark repository.')
+publish_campaign.add_argument('-m',
+                              dest='commit_msg',
+                              metavar='<commit_msg>',
+                              required=True,
+                              help='Commit message.')
 
-# Call script according to user command
+publish_benchmark = publish_subparser.add_parser('benchmark')
+publish_benchmark.add_argument('-b',
+                               help='Name of the benchmark from which results are compared',
+                               dest='benchmark',
+                               required=True,
+                               choices=benchmark_list)
+publish_benchmark.add_argument('-p',
+                               help='Name of the test platform. This parameter ss used to'
+                                    ' search the benchmark and also to pubish it under a'
+                                    ' directory with its name',
+                               dest='platform',
+                               choices=platform_list,
+                               required=True,
+                               default=default_platform)
+publish_benchmark.add_argument('-d',
+                               dest='dest_dir',
+                               metavar='<directory>',
+                               help='Directory where to store the benchmark results file.'
+                                    ' This directory will be created under the `results`'
+                                    ' directory located in the local benchmark repository.',
+                               required=True)
+publish_benchmark.add_argument('-i',
+                               dest='run_id',
+                               metavar='<integer>',
+                               help='Benchmark run id. If not given, the last benchmark'
+                                    ' will be published, ie, the one with greater run id')
+publish_benchmark.add_argument('-m',
+                              dest='commit_msg',
+                              metavar='<commit_msg>',
+                              required=True,
+                              help='Commit message.')
+
+publish_clone = publish_subparser.add_parser('download')
+publish_push = publish_subparser.add_parser('update-remote')
+
+# Parser info
+parser_info = subparsers.add_parser('info', help='Displays path settings origin.')
+parser_info.add_argument('-v', '--verbose', action='store_true', help=argparse.SUPPRESS)
+
 args = parser.parse_args()
 
-# initialize class
-platform_arg = ""
-benchmark_arg = ""
-if vars(args).has_key('p'):
+platform_arg = ''
+benchmark_arg = ''
+if 'p' in vars(args):
     platform_arg = args.p
-if vars(args).has_key('b'):
+if 'b' in vars(args):
     benchmark_arg = args.b
 
 commands = ubench_commands.UbenchCmd(platform=platform_arg, benchmark_list=benchmark_arg)
@@ -207,12 +347,17 @@ commands = ubench_commands.UbenchCmd(platform=platform_arg, benchmark_list=bench
 if args.subparser_name == 'run':
     options_dictionary = vars(args)
     options_dictionary['raw_cli'] = sys.argv
-    commands.run(options_dictionary)
-    # commands.run(w_list=args.w, customp_list=args.custom_params, execute=args.execute,raw_cli=sys.argv)
+    sys.exit(not commands.run(options_dictionary))
+elif args.subparser_name == 'campaign':
+    if args.dest_dir is not None and args.commit_msg is None:
+        print('ubench : must provide commit message when publishing results, exiting')
+        exit(1)
+    commands.campaign(args.campaign_file, args.reference,
+                      args.dest_dir, args.commit_msg)
 elif args.subparser_name == 'fetch':
     commands.fetch()
 elif args.subparser_name == 'result':
-    commands.result(args.i, args.debug)
+    commands.result(args.i)
 elif args.subparser_name == 'log':
     commands.log(id_list=args.i)
 elif args.subparser_name == 'list':
@@ -222,7 +367,9 @@ elif args.subparser_name == 'listparams':
 elif args.subparser_name == 'report':
     commands.report(args.metadata_file, args.output_dir)
 elif args.subparser_name == 'compare':
-    commands.compare(args.input_dirs, args.benchmark_name, \
-                     (args.context,args.compared_context), args.threshold)
+    commands.compare(args.input_dirs, args.benchmark_name,
+                     (args.context, args.compared_context), args.threshold)
 elif args.subparser_name == 'info':
-    uconf.print_config()
+    uconf.print_config(args.verbose)
+elif args.subparser_name == 'publish':
+    commands.publish(vars(args))
