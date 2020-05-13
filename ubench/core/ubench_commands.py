@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 ##############################################################################
 #  This file is part of the UncleBench benchmarking tool.                    #
-#        Copyright (C) 2017  EDF SA                                          #
+#        Copyright (C) 2019 EDF SA                                           #
 #                                                                            #
 #  UncleBench is free software: you can redistribute it and/or modify        #
 #  it under the terms of the GNU General Public License as published by      #
@@ -10,248 +10,322 @@
 #                                                                            #
 #  UncleBench is distributed in the hope that it will be useful,             #
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of            #
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the              #
 #  GNU General Public License for more details.                              #
 #                                                                            #
 #  You should have received a copy of the GNU General Public License         #
-#  along with UncleBench.  If not, see <http://www.gnu.org/licenses/>.       #
+#  along with UncleBench. If not, see <http://www.gnu.org/licenses/>.        #
 #                                                                            #
 ##############################################################################
+# pylint: disable=superfluous-parens, fixme, invalid-name
+""" Define UbenchCmd class """
 
-"""
-Define UbenchCmd class
-"""
+
 import os
-import re
 from subprocess import Popen
-import ubench.core.ubench_config as uconfig
+import yaml
+
+from ubench.core.ubench_config import UbenchConfig
 import ubench.benchmark_managers.benchmark_manager_set as bms
-
-try:
-    import ubench.scheduler_interfaces.slurm_interface as slurmi
-except ImportError:
-    pass
-
+from ubench.benchmark_managers.campaign_benchmark_manager import CampaignManager
 import ubench.benchmarking_tools_interfaces.jube_xml_parser as jube_xml_parser
 import ubench.core.fetcher as fetcher
 import ubench.data_management.comparison_writer as comparison_writer
-import ubench.data_management.report_writer as report_writer
-import pandas as pd
-import yaml
+import ubench.data_management.report as report
+from ubench.scheduler_interfaces.slurm_interface import wlist_to_scheduler_wlist
+from ubench.data_management.publisher import Campaign, Benchmark, Publisher
+import ubench.utils as utils
 
 
-class UbenchCmd:
+class UbenchCmd(object):
+    """ Implements Unclebench commands.
+
+    Each Unclebench command that can be calld from the command
+    line is defined in this class.
+
+    Attributes:
+        run_dir
+        platform
+        benchmark_list
+        bm_set
+        pub_vcs : which vcs to use
+        pub_repo_str : string used to clone repository
+        pub_dir : local repository directory
+
+    Methods:
+        log
+        list_parameters
+        result
+        run
+        fetch
+        compare
+        report
+        campaign
+        publish
     """
-    Class defining methods corresponding to unclebench commands
-    """
+
     def __init__(self, platform, benchmark_list=None):
-        """
-        TOCOMMENT
-        """
-        self.uconf = uconfig.UbenchConfig()
-        self.run_dir = os.path.join(self.uconf.run_dir, platform)
+        """ Class constructor """
+
+        self.run_dir = os.path.join(UbenchConfig().run_dir, platform)
         self.platform = platform
 
         # Add benchmark managers for each benchmark in directory
         self.benchmark_list = benchmark_list
-        self.bm_set = bms.BenchmarkManagerSet(benchmark_list, platform, self.uconf)
+        self.bm_set = bms.BenchmarkManagerSet(benchmark_list, platform)
 
+        # Attributs for Publisher class
+        self.pub_vcs = UbenchConfig().pub_vcs
+        self.pub_repo_str = UbenchConfig().pub_repo
+        self.pub_dir = UbenchConfig().results_dir
 
-    def log(self, id_list=None):
-        """ TOCOMMENT"""
-        if not id_list:
+    def log(self, id_list): # pylint: disable=dangerous-default-value
+        """ Provides information about benchmark execution
+
+        Args:
+            id_list (optional): by default, it will print information on last
+                                execution for the instance benchmark and platform.
+        """
+        if id_list is None:
             id_list = [-1]
+
         for idb in id_list:
             self.bm_set.print_log(int(idb))
 
 
     def list_parameters(self, default_values=False):
-        """ TOCOMMENT"""
+        """ Lists benchmark parameters """
+
         self.bm_set.list_parameters(default_values)
 
 
-    def result(self, id_list,debug_mode):
-        """ TOCOMMENT """
-        if not id_list:
+    def result(self, id_list): # pylint: disable=dangerous-default-value
+        """ Prints benchmark results """
+
+        if id_list is None:
             id_list = ['last']
 
         for idb in id_list:
-            if idb == '-1':
-                idb = 'last'
-            self.bm_set.analyse(idb)
-            self.bm_set.extract_results(idb)
-            self.bm_set.print_result_array(debug_mode)
+            self.bm_set.result(idb)
+            # self.bm_set.analyse(idb)
+            # self.bm_set.extract_results(idb)
+            self.bm_set.print_result_array()
+
 
     def listb(self):
         """ Lists runs information"""
+
         self.bm_set.list_runs()
 
-    # def run(self, w_list=None, customp_list=None, execute=False,raw_cli=None):
-    def run(self, opt_dict ={}):
-        """ TOCOMMENT """
-        if opt_dict['w']:
-            try:
-                opt_dict['w'] = self.translate_wlist_to_scheduler_wlist(opt_dict['w'])
-            except Exception as exc:
-                print '---- Custom node configuration is not valid : {0}'.format(str(exc))
-                return
-        print ''
-        print '-- Ubench platform name set to : {0}'.format(self.platform)
 
-        if not os.path.isdir(self.uconf.resource_dir):
-            print '---- The resource directory {0} does not exist.'.format(self.uconf.resource_dir)+\
-                'Please run ubench fetch to retrieve sources and test cases.'
-            return
+    def run(self, opt_dict={}):  # pylint: disable=dangerous-default-value
+        """  Run benchmark
+
+        Args:
+            dict_options:
+
+        Returns:
+            Bool: True if an error is raised, False otherwise
+        """
+
+
+        if opt_dict['w']:
+
+            try:
+                opt_dict['w'] = wlist_to_scheduler_wlist(opt_dict['w'])
+            except Exception as exc:  # pylint: disable=broad-except
+                print('---- Custom node configuration is not valid : {0}'.format(str(exc)))
+                return False
+        print('')
+        print('-- Ubench platform name set to : {0}'.format(self.platform))
+
+        if not os.path.isdir(UbenchConfig().resource_dir):
+            print('---- The resource directory {0} does not exist.'.
+                  format(UbenchConfig().resource_dir) +
+                  'Please run ubench fetch to retrieve sources and test cases.')
+            return False
 
         # Set custom parameters
         dict_options = {}
+
+        if opt_dict['custom_params']:
+            for elem in opt_dict['custom_params']:
+                try:
+                    param, value = elem.split(':', 1)
+                    dict_options[param] = value
+                except ValueError:
+                    print('---- {0} is not formated correctly'.format(elem) +
+                          ', please consider using : -c param:new_value')
+
+        # we read a file which contains a dictionary with the options
         if opt_dict['file_params']:
-          with open(opt_dict['file_params'],'r') as params_file:
-            dict_options=yaml.load(params_file)
+            with open(opt_dict['file_params'], 'r') as params_file:
+                dict_options = yaml.load(params_file)
 
-          self.bm_set.set_parameter(dict_options)
-          # we read a file which contains a dictionary with the options
-
-        if opt_dict.has_key('custom_params'):
-          for elem in opt_dict['custom_params']:
-            try:
-              splitted_param = re.split(':', elem, 1)
-              dict_options[splitted_param[0]] = splitted_param[1]
-            except Exception as exc:
-              print '---- {0} is not formated correctly'.format(elem)+\
-                ', please consider using : -c param:new_value'
-            self.bm_set.set_parameter(dict_options)
+        # we redefine custom params
+        opt_dict['custom_params'] = dict_options
 
         # Run each benchmarks
-        self.bm_set.run(self.platform, opt_dict)
+        try:
+            self.bm_set.run(opt_dict)
+        except (RuntimeError, OSError):
+            return False
 
+        return True
+
+    def campaign(self, campaign_file, result_ref=None,
+                 publish_dir=None, commit_msg=None):
+        ''' Executes campaign '''
+        campaign = CampaignManager(campaign_file, result_ref)
+        campaign.init_campaign()
+        campaign.run()
+        if publish_dir is not None:
+            c = Campaign(local_dir=self.pub_dir, publish_dir=publish_dir,
+                         campaign_dir=campaign.campaign_dir, run_dir=self.run_dir)
+            c.publish(commit_msg)
 
     def fetch(self):
-        """ TOCOMMENT """
+        """ Fetches benchmarks sources """
+
         for benchmark_name in self.benchmark_list:
-            benchmark_dir = os.path.join(self.uconf.benchmark_dir, benchmark_name)
-            benchmark_files = [file_b for  file_b in os.listdir(benchmark_dir) \
+            benchmark_dir = os.path.join(UbenchConfig().benchmark_dir, benchmark_name)
+            benchmark_files = [file_b for file_b in os.listdir(benchmark_dir)
                                if file_b.endswith(".xml")]
             jube_xml_files = jube_xml_parser.JubeXMLParser(benchmark_dir, benchmark_files)
             multisource = jube_xml_files.get_bench_multisource()
 
             if multisource is None:
-                print "ERROR !! : Multisource information for benchmark not found"
-                return None
+                print("ERROR !! : Multisource information for benchmark not found")
+                exit(1)
 
-            fetch_bench = fetcher.Fetcher(resource_dir=self.uconf.resource_dir,\
+            fetch_bench = fetcher.Fetcher(resource_dir=UbenchConfig().resource_dir,
                                           benchmark_name=benchmark_name)
             for source in multisource:
 
-                if not source.has_key('do_cmds'):
+                if 'do_cmds' not in source:
                     source['do_cmds'] = None
 
                 if source['protocol'] == 'https':
                     fetch_bench.https(source['url'], source['files'])
-                elif source['protocol'] == 'svn' or source['protocol'] == 'git':
-                    if not source.has_key('revision'):
-                        source['revision'] = None
-                    if not source.has_key('branch'):
-                        source['branch'] = None
 
-                    fetch_bench.scm_fetch(source['url'], source['files'], \
-                                          source['protocol'], source['revision'], \
+                elif source['protocol'] == 'svn' or source['protocol'] == 'git':
+                    if 'revision' not in source:
+                        source['revision'] = [None]
+                    if 'branch' not in source:
+                        source['branch'] = None
+                    fetch_bench.scm_fetch(source['url'], source['files'],
+                                          source['protocol'], source['revision'],
                                           source['branch'], source['do_cmds'])
+
                 elif source['protocol'] == 'local':
                     fetch_bench.local(source['files'], source['do_cmds'])
 
+    def _return_dirs(self, ref):
+        ''' Returns directory from commit hash
 
-    def compare(self, input_directories, benchmark_name , context=(None,None), \
+        This function receives a reference as argument
+        which can be a directory or a commit hash.
+
+        If this function is called with a directory as its
+        argument it will return the same thing it received.
+        That is, nothing to be done. On the other hand if
+        it was called with a commit hash, it will return
+        the list of directories regarding that commit.
+
+        Args:
+            ref (string) can be a directory or a commit hash
+        Returns:
+            directory or list of directories related to commit hash
+        '''
+        if os.path.isdir(ref):
+            directory_ref = ref
+        else:
+            publisher = Publisher(repo_str=self.pub_repo_str,
+                                  local_dir=self.pub_dir, vcs=self.pub_vcs)
+            bench_files = publisher.get_files_from_ref(ref)
+            directory_ref = os.path.dirname(bench_files.values()[0])
+
+        return directory_ref
+
+    # pylint: disable=no-self-use
+    def compare(self, input_directories, benchmark_name, context=(None, None),
                 threshold=None):
+        """ Compare benchmark results from different directories.
+
+        Args:
+            input_directories:
+            benchmark_name:
+            context:
         """
-        Compare bencharks results from different directories.
-        """
+        # pylint: disable=bad-whitespace
+        input_directories = [ self._return_dirs(ref) for ref in input_directories ]
+
         cwriter = comparison_writer.ComparisonWriter(threshold)
-        print "    comparing :"
+        print("    comparing :")
         for rdir in input_directories:
-            print "    - "+rdir
-        print ""
+            print("    - "+rdir)
+        print("")
         cwriter.print_comparison(benchmark_name, input_directories, context)
 
 
     def report(self, metadata_file, output_dir):
+        """ Build a performance report.
+
+        Args:
+            metadata_file: file containing parameters for report build
+            outpit_dir: where to store the report
         """
-        Build a performance report.
-        """
-        bench_template = os.path.join(self.uconf.templates_path, "bench.html")
-        compare_template =  os.path.join(self.uconf.templates_path, "compare.html")
-        report_template =  os.path.join(self.uconf.templates_path, "report.html")
-        rwriter = report_writer.ReportWriter(metadata_file, bench_template,
-                                             compare_template, report_template)
+        bench_template = os.path.join(UbenchConfig().templates_path, "bench.html")
+        compare_template = os.path.join(UbenchConfig().templates_path, "compare.html")
+        report_template = os.path.join(UbenchConfig().templates_path, "report.html")
+        perf_report = report.Report(metadata_file, bench_template,
+                                    compare_template, report_template)
         report_name = "ubench_performance_report"
 
-        print("    Writing report {} in {} directory".format(report_name+".html", output_dir))
-        rwriter.write_report(output_dir, report_name)
+        print(("    Writing report {} in {} directory".format(report_name+".html", output_dir)))
+        perf_report.write(output_dir, report_name)
 
-        asciidoctor_cmd\
-            = 'asciidoctor -a stylesheet=' + self.uconf.stylesheet_path + " "\
-            + os.path.join(os.getcwd(),output_dir,report_name+".asc")
+        asciidoctor_cmd = ('asciidoctor -a stylesheet=' + UbenchConfig().stylesheet_path
+                           + " " + os.path.join(os.getcwd(), output_dir, report_name + ".asc"))
 
-        Popen(asciidoctor_cmd, cwd=os.getcwd(), shell=True)
+        Popen(asciidoctor_cmd, cwd=os.getcwd(), shell=True, universal_newlines=True)
 
 
-    def translate_wlist_to_scheduler_wlist(self, w_list_arg):
-        """
-        Translate ubench custom node list format to scheduler custome node list format
-        TODO determine scheduler_interface from platform data.
-        """
-        try:
-            scheduler_interface = slurmi.SlurmInterface()
-        except:
-            print "Warning!! Unable to load slurm module"
-            scheduler_interface = None
-            return
+    def publish(self, options):
+        ''' Guide method to Publish class functionality
 
-        w_list = list(w_list_arg)
-        for sub_wlist in w_list:
-            sub_wlist_temp = list(sub_wlist)
-            stride = 0
-        for idx, welem in enumerate(sub_wlist_temp):
-            # Manage the all keyword that is meant to launch benchmarks on evry idle node
-            catch = re.search(r'^all(\d+)$', str(welem))
-            idxn = idx+stride
-            if catch:
-                slice_size = int(catch.group(1))
-                available_nodes_list = scheduler_interface.get_available_nodes(slice_size)
-                njobs = len(available_nodes_list)
-                sub_wlist[idxn:idxn+1] = zip([slice_size]*njobs, available_nodes_list)
-                stride += njobs-1
-            else:
-                # Manage the cn[10,13-17] notation
-                catch = re.search(r'^(\D+.*)$', str(welem))
-                if catch:
-                    nnodes_list = [scheduler_interface.get_nnodes_from_string(catch.group(1))]
-                    nodes_list = [catch.group(1)]
-                    sub_wlist[idxn:idxn+1] = zip(nnodes_list, nodes_list)
-                else:
-                    # Manage the 2,4 notation that is needed to launch jobs
-                    # without defined node targets.
-                    catch = re.search(r'^([\d+,]*)([\d]+)$', str(welem))
-                    if catch:
-                        nnodes_list = [int(x) for x in re.split(',', str(welem))]
-                        sub_wlist[idxn:idxn+1] = zip(nnodes_list, [None]*len(nnodes_list))
-                        stride += len(nnodes_list)-1
-                    else:
-                        # Manage the 2,4,cn[200-205] notation that is used
-                        # to get cn[200-201] cn[200-203]
-                        catch = re.search(r'^([\d+,]*[\d+]),(.*)$', str(welem))
-                        if catch:
-                            nnodes_list = [int(x) for x in re.split(',', catch.group(1))]
-                            nodes_list = str(catch.group(2))
-                            sub_wlist[idxn:idxn+1]\
-                                = zip(nnodes_list, \
-                                      scheduler_interface.\
-                                      get_truncated_nodes_lists(nnodes_list, nodes_list))
+        This method will read the variables needed to execute
+        each command and then execute it.
 
-                            stride += len(nnodes_list)-1
-                        else:
-                            raise Exception(str(welem)+'format is not correct')
+        '''
+        if (self.pub_vcs == 'undefined' or self.pub_repo_str == 'undefined'
+          or self.pub_dir == 'undefined'):
+            print('Some or all of the parameters needed by the publish method are missing.\n'
+                  'Please fill in the following parameters using ubench.conf'
+                  ' file or environment variables: UBENCH_PUBLISH_VCS,'
+                  ' UBENCH_PUBLISH_REPOSITORY, UBENCH_RESULTS_DIR')
+            exit(1)
 
-        # Flatten the w_list
-        w_list = [item for sublist in w_list for item in sublist]
-        return w_list
+        if options['command'] == 'campaign':
+            campaign = Campaign(local_dir=self.pub_dir, publish_dir=options['dest_dir'],
+                                campaign_dir=options['campaign_dir'], run_dir=self.run_dir)
+            campaign.publish(options['commit_msg'])
+
+        if options['command'] == 'benchmark':
+            benchmark = Benchmark(local_dir=self.pub_dir, publish_dir=options['dest_dir'],
+                                  benchmark=options['benchmark'], platform=options['platform'],
+                                  run_dir=self.run_dir)
+            benchmark.publish(options['commit_msg'])
+
+        if options['command'] == 'download':
+            if os.path.isdir(self.pub_dir):
+                print('Error: {} already exists. Please remove it or setup UBENCH_RESULTS_DIR'
+                      ' to point to another directory.'.format(self.pub_dir))
+                exit(1)
+            repository = Publisher(repo_str=self.pub_repo_str, vcs=self.pub_vcs,
+                                   local_dir=utils.trim_tail(self.pub_dir))
+            repository.download()
+
+        if options['command'] == 'update-remote':
+            repository = Publisher(vcs=self.pub_vcs, local_dir=self.pub_dir)
+            repository.update_remote()

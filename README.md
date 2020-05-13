@@ -78,7 +78,8 @@ To activate the virtual environment:
 
 We install unclebench dependencies:
 
-    pip install pytest pytest_mock mock pyyaml
+    pip install -r requirements.txt
+    pip install pytest pytest_mock mock
 
 To execute examples using platform Zbook15 we should install JUBE version 2.1.0 before, [download JUBE](http://www.fz-juelich.de/ias/jsc/EN/Expertise/Support/Software/JUBE/JUBE2/jube-download_node.html;jsessionid=7444E10288FBD0EE8091B9AD8FE60F73):
 
@@ -94,8 +95,14 @@ To run benchmarks locally:
 The variables 'UBENCH_RUN_DIR_BENCH' and 'UBENCH_RESOURCE_DIR' will be created automatically and they will point to directories in '/tmp/'.
 To execute unitary tests:
     
+    export PYTHONPATH=.
     pytest
 
+Some tests could take some minutes to see tests output execute:
+
+```buildoutcfg
+pytest -s
+```
 Licence
 -------
 
