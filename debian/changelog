@@ -1,3 +1,16 @@
+unclebench (1:0.4.0-0sci9u1) scibian9; urgency=medium
+
+  * New upstream version 0.4.0
+
+    Adds new ubench campaign and ubench publish commands.
+
+    ubench campaign allows to run a set of benchmarks previously defined
+    in a recipe like file. Together with ubench publish, the results can
+    be added automatically to a repository containing the performance
+    history of the cluster.
+
+ -- Eduardo Rothe <eduardo-externe.rothe@edf.fr>  Wed, 13 May 2020 10:27:29 +0200
+
 unclebench (1:0.3.7-0sci9u1) scibian9; urgency=medium
 
   * New Scibian release 1:0.3.7-0sci9u1
