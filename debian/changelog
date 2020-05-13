@@ -1,3 +1,9 @@
+unclebench (1:1.0.0-0sci8u1) scibian8; urgency=medium
+
+  * New upstream version 1.0.0
+
+ -- Eduardo Rothe <eduardo-externe.rothe@edf.fr>  Wed, 13 May 2020 15:27:58 +0200
+
 unclebench (1:0.4.0-0sci8u1) scibian8; urgency=medium
 
   * New upstream version 0.4.0
