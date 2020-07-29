@@ -1,3 +1,9 @@
+unclebench (1:1.0.1-0sci9u1) scibian9; urgency=medium
+
+  * New Scibian release 1:1.0.1-0sci9u1
+
+ -- Eduardo Rothe <eduardo-externe.rothe@edf.fr>  Wed, 29 Jul 2020 16:18:56 +0200
+
 unclebench (1:1.0.0-0sci9u1) scibian9; urgency=medium
 
   * New upstream version 1.0.0
