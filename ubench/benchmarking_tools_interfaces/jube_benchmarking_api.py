@@ -17,9 +17,10 @@
 #  along with UncleBench. If not, see <http://www.gnu.org/licenses/>.        #
 #                                                                            #
 ##############################################################################
-""" Jube benchmarking API module """
+''' Jube benchmarking API module '''
 
 import os
+import sys
 import re
 import csv
 import tempfile
@@ -27,19 +28,21 @@ import time
 import hashlib
 from subprocess import Popen, PIPE
 from collections import defaultdict
+
 import ubench.utils as utils
 import ubench.data_management.data_store_yaml as data_store_yaml
 from ubench.core.ubench_config import UbenchConfig
 from ubench.benchmarking_tools_interfaces.benchmarking_api import BenchmarkingAPI
-
-# from ubench.benchmark_interface.benchmark_api import BenchmarkAPI
+import ubench.scheduler_interfaces.slurm_interface as slurmi
 from . import jube_xml_parser
 
-import ubench.scheduler_interfaces.slurm_interface as slurmi
+PY3_OR_LATER = sys.version_info[0] >= 3
 
-#pylint: disable=superfluous-parens
+#pylint: disable=superfluous-parens, too-many-instance-attributes, super-init-not-called
+#pylint: disable=arguments-differ, invalid-name, redefined-variable-type, no-self-use
+#pylint: disable=attribute-defined-outside-init
 class JubeBenchmarkingAPI(BenchmarkingAPI):
-    """ Jube benchmarking API class implements abstract class benchmarkingAPI
+    ''' Jube benchmarking API class implements abstract class benchmarkingAPI
     to use Jube backend.
 
     Methods:
@@ -58,16 +61,16 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
         get_bench_rundir
         parse_jube_parameter
         val_repl
-    """
+    '''
 
 
     def __init__(self, benchmark, platform):
-        """ Class constructor
+        ''' Class constructor
 
         Args:
             benchmark (str): name of the benchmark
             platform (str): name of the platform
-        """
+        '''
         self.benchmark = benchmark
         self.platform = platform
         self.benchmark_dir = os.path.join(UbenchConfig().benchmark_dir,
@@ -84,7 +87,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
     @property
     def jube_files(self):
-        """ Jube files getter"""
+        ''' Jube files getter '''
         if not self._jube_files:
             benchmark_files = [file_b for file_b in os.listdir(self.benchmark_dir)
                                if file_b.endswith('.xml')]
@@ -96,17 +99,19 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
         return self._jube_files
 
 
-    def result(self, benchmark_id):
-        """ Generate and print results
+    def result(self, benchmark_id, output=True, campaign=False):
+        ''' Generate and print results
         Args:
              (int) benchmark_id: id of the benchmark
+             (bool) output: if true prints output
+             (bool) campaign: enables different behaviour if called from campaign
 
         Returns:
             (list) numeric results
 
         Raises:
             IOError
-        """
+        '''
 
         outpath = self.jube_files.get_bench_outputdir()
         benchmark_results_path = os.path.join(self.benchmark_path, outpath,
@@ -114,24 +119,31 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
                                                                     outpath))
 
         if not os.path.isdir(benchmark_results_path):
-            print("""----!Error: benchmark run directory {}
-            does not exist""".format(benchmark_results_path))
+            print('''----!Error: benchmark run directory {}
+            does not exist'''.format(benchmark_results_path))
             raise IOError
 
-        print('----analysing {0} results'.format(self.benchmark))
+        if output:
+            print('----analysing {0} results'.format(self.benchmark))
         self._analyse(benchmark_id)
-        print('----extracting results')
-        print('----benchmark results path: {0}'.format(benchmark_results_path))
+        if output:
+            print('----extracting results')
+            print('----benchmark results path: {0}'.format(benchmark_results_path))
         results_array = self._extract_results(benchmark_id)
-        print("""---- writing benchmark data in:
-         {0}/bench_results.yaml""".format(benchmark_results_path))
+        if output:
+            print('''---- writing benchmark data in:
+             {0}/bench_results.yaml'''.format(benchmark_results_path))
         self.results = self._write_bench_data(benchmark_id)
+
+        if campaign:
+            self.result_array = results_array
+            self.print_result_array()
 
         return results_array
 
 
     def _analyse(self, benchmark_id):
-        """ Analyze benchmark results
+        ''' Executes `jube analyse` command
 
         Args:
             benchmark_id (int): id of the benchmark to be analyzed
@@ -140,7 +152,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
             (str) Result directory absolute path
         Raises:
             RuntimeError
-        """
+        '''
 
         outpath = self.jube_files.get_bench_outputdir()
 
@@ -152,7 +164,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
         if ret_code:
             print(stderr)
-            msg = "Error when executing command: {}".format(cmd_str)
+            msg = 'Error when executing command: {}'.format(cmd_str)
             raise RuntimeError(msg)
 
         cmd_str = 'jube analyse {} --id {}'.format(outpath, benchmark_id)
@@ -160,19 +172,19 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
         if ret_code:
             print(stderr)
-            msg = "Error when executing command: {}".format(cmd_str)
+            msg = 'Error when executing command: {}'.format(cmd_str)
             raise RuntimeError(msg)
 
 
     def get_log(self, idb=-1):  # pylint: disable=too-many-locals
-        """ Get a log from a benchmark run
+        ''' Get a log from a benchmark run
 
         Args:
             idb (int): id of the benchmark
 
         Returns:
             (str) log
-        """
+        '''
         out_path = os.path.join(self.benchmark_path,
                                 self.jube_files.get_bench_outputdir())
         # If idb equals -1 get highest id directory found in out_dir
@@ -224,14 +236,14 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def get_status_info(self, benchmark_id):
-        """ Get the status for a benchmark run
+        ''' Get the status for a benchmark run
 
         Args:
             benchmark_id (int): id of the benchmark
 
         Returns:
             (dict) global_status
-        """
+        '''
 
         outpath = self.jube_files.get_bench_outputdir()
 
@@ -268,15 +280,16 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
         return global_status
 
     def _write_bench_data(self, benchmark_id): # pylint: disable=too-many-locals
-        """ Generates benchmarks results data
+        ''' Generates benchmarks results data
+
+        Writes bench_results.yaml
 
         Args:
             benchmark_id (int): id of the benchmark
 
         Returns:
             (dict) mapping between Jube execution directories and result values
-        """
-
+        '''
         outpath = self.jube_files.get_bench_outputdir()
         benchmark_rundir = self.get_bench_rundir(benchmark_id, outpath)
         context_names, context = self._get_execution_context(benchmark_id)
@@ -285,7 +298,12 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
         common_fields = [n for n in context_names if n in field_names]
         map_dir = {}
         for exec_id, values in context.items():
-            key_results = hashlib.md5("".join([values[n] for n in common_fields]))
+            key_results = hashlib.md5(''.join([values[n] for n in common_fields]).encode('utf-8'))
+
+            key = key_results.hexdigest()
+            if key not in results:
+                results[key] = 'failed'
+
             context[exec_id]['results_bench'] = results[key_results.hexdigest()]
             context[exec_id]['context_fields'] = common_fields
             exec_dir = "{}_execute".format(values['jube_wp_id'].zfill(6))
@@ -329,14 +347,14 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def _extract_results(self, benchmark_id):  # pylint: disable=too-many-locals
-        """ Get result from a jube benchmark with its id and build a python result array
+        ''' Get result from a jube benchmark with its id and build a python result array
 
         Args:
             benchmark_id (int): id of the benchmark
 
         Returns:
             (str) result array
-        """
+        '''
         outpath = self.jube_files.get_bench_outputdir()
         benchmark_runpath = os.path.join(self.benchmark_path, outpath,
                                          self.get_bench_rundir(benchmark_id, outpath))
@@ -373,14 +391,15 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def _get_execution_context(self, benchmark_id): # pylint: disable=no-self-use
-
-        separator = "~"
+        ''' docstring '''
+        separator = '~'
         context = {}
         outpath = self.jube_files.get_bench_outputdir()
         jube_cmd = 'jube info ./{0} --id {1} --step execute -p -c \"{2}\"'.format(outpath,
                                                                                   benchmark_id,
                                                                                   separator)
-        cmd_output = tempfile.TemporaryFile()
+                                                                                  
+        cmd_output = tempfile.TemporaryFile(mode='w+t') if PY3_OR_LATER else tempfile.TemporaryFile()
         result_from_jube = Popen(jube_cmd, cwd=self.benchmark_path,
                                  shell=True, stdout=cmd_output,
                                  universal_newlines=True)
@@ -395,8 +414,8 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
             if len(context_names) == len(row):
                 context[row['id']] = row
             else:
-                msg = """Error when reading jube info output
-                This error is probably due to the chosen separator"""
+                msg = '''Error when reading jube info output
+                This error is probably due to the chosen separator'''
                 raise msg
 
         cmd_output.close()
@@ -405,7 +424,9 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def _get_results(self, benchmark_rundir, context_names): # pylint: disable=too-many-locals
+        ''' docstring '''
 
+        # file generated by jube
         result_file_path = os.path.join(benchmark_rundir, 'result/ubench_results.dat')
         results = {}
         field_names = []
@@ -418,7 +439,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
             for row in reader:
 
-                md5 = hashlib.md5("".join([row[n] for n in context_names if n in field_names]))
+                md5 = hashlib.md5(''.join([row[n] for n in context_names if n in field_names]).encode('utf-8'))
                 key = md5.hexdigest()
                 values = {k:v for k, v in row.items() if k in result_fields}
                 results[key] = values
@@ -437,7 +458,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def run(self, opts):
-        """ Run benchmark on a given platform and return the benchmark run directory path
+        ''' Run benchmark on a given platform and return the benchmark run directory path
         and a benchmark ID.
 
         Args:
@@ -445,7 +466,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
         Returns:
             (str) return absolute path of the benchmark result directory
-        """
+        '''
 
         # Modify bench xml
         self.jube_files.load_platform_xml(self.platform)
@@ -485,11 +506,11 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def _set_custom_nodes(self, nodes_list):
-        """  Modify benchmark xml file to set custom nodes configurations.
+        '''  Modify benchmark xml file to set custom nodes configurations.
 
         Args:
             nodes_list (list): list of tuples ex: [(6, None), (1, 'cn184'), (4, 'cn[380,431-433]')]
-        """
+        '''
         nodes_id_list = [name for num, name in nodes_list]
         nnodes_list = [num for num, name in nodes_list]
 
@@ -505,14 +526,14 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def list_parameters(self, default_values):
-        """  List benchmark customisable parameters
+        '''  List benchmark customisable parameters
 
         Args:
             default_values:
 
         Returns:
             (list) List of tuples [(param1,value),(param2,value),....]
-        """
+        '''
 
         platform_params = self.jube_files.get_params_platform(self.platform)
         benchmark_params = self.jube_files.get_params_bench()
@@ -530,7 +551,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def get_bench_rundir(self, benchmark_id, outpath):
-        """ Internal method  """
+        ''' Internal method  '''
 
         path_id = 0
         abs_output_path = os.path.join(self.benchmark_path, outpath)
@@ -545,7 +566,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def parse_jube_parameter(self, list_jube_parameters):  # pylint: disable=too-many-locals
-        """ Internal method """
+        ''' Internal method '''
 
         # Get constants
         const_hash = {}
@@ -604,7 +625,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
 
     def val_repl(self, matchobj):
-        """ Internal method """
+        ''' Internal method '''
 
         match_variable_name = re.match(r'^\.*\$(\w+)\.*|^\.*\$\{(\w+)\\}\.*',
                                        matchobj.group(0)).group(1, 2)
@@ -633,7 +654,7 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
 
     @staticmethod
     def get_max_id(file_list): # pylint: disable=no-self-use
-        """ Return max id directory"""
+        ''' Return max id directory'''
         max_id = -1
         ids_dict = {-1:'0000000'}
         if file_list:
@@ -642,8 +663,52 @@ class JubeBenchmarkingAPI(BenchmarkingAPI):
         return max_id, ids_dict[max_id]
 
 
+    def print_result_array(self, output_file=None):
+        ''' Asciidoc printing of Jube result array
+
+        This method is duplicated. Borrowed from benchmark_manager_set and
+        used to print campaign results. To improve in a near release.
+
+        Args:
+            output_file (str): path of a file where to write the array.
+                               If not set the array is printed on stdout.
+        '''
+        result_array = self.result_array
+
+        self.result_array = result_array
+        if output_file:
+            output_file.write('[options="header"]\n')
+            output_file.write('|=== \n')
+            for row in self.result_array:
+                output_file.write('|')
+                output_file.write('|'.join(row).replace('\n', ''))
+                output_file.write('\n')
+            output_file.write('|=== \n')
+        else:
+            # Print formatted array on stdout
+            max_width = []
+            for row in self.result_array:
+                col = 0
+                for elem in row:
+                    if (len(max_width)-1) < col:
+                        max_width.append(len(elem))
+                    else:
+                        max_width[col] = max(max_width[col], len(elem))
+                    col += 1
+
+            print('')
+            print_format = '{{:<{}}} '*len(max_width)
+            # we add 1 to each max width
+            print_format = print_format.format(*[w+1 for w in max_width])
+            for row in self.result_array:
+                print(print_format.format(*row))
+
+            print('')
+
+
 class JubeRun(object):
-    """This class handles jube execution"""
+    ''' This class handles jube execution '''
+
     def __init__(self, benchmark, platform):
         self.benchmark = benchmark
         self.platform = platform
@@ -656,7 +721,7 @@ class JubeRun(object):
 
     @property
     def job_ids(self):
-        """ Returns the jobs id associated to a JubeRun"""
+        ''' Returns the jobs id associated to a JubeRun '''
         if not self._job_ids:
             if self.jube_returncode == 0:
                 job_ids = [j_id for j_id in self.extract_job_ids().values() if j_id.isdigit()]
@@ -666,6 +731,7 @@ class JubeRun(object):
 
     @property
     def exec_dir(self):
+        ''' docstring '''
         if not self._exec_dir:
             if self.jube_returncode == 0:
                 self._exec_dir = self.extract_job_ids()
@@ -674,8 +740,8 @@ class JubeRun(object):
 
     @property
     def jube_returncode(self):
-        """Returns returned code of jube:
-        if the process is running the value is None"""
+        ''' Returns returned code of jube:
+        if the process is running the value is None '''
 
         if not self._jube_returncode:
             self._jube_returncode = self.jube_process.poll()
@@ -684,7 +750,7 @@ class JubeRun(object):
 
 
     def run(self, output_dir, benchmark_path):
-        """ Execute benchmark"""
+        ''' Execute benchmark '''
         max_id = None
         numdir = None
 
@@ -720,13 +786,13 @@ class JubeRun(object):
 
 
     def kill(self):
-        """Kill jube process"""
+        ''' Kill jube process '''
         #Warning! by killing jube process we dont kill all child process
         self.jube_process.kill()
 
 
     def extract_job_ids(self):
-        """ Get jobs' ids from directory"""
+        ''' Get jobs' ids from directory '''
         ## we have to get the id directory elsewhere
         id_dir = self.result_path
         dir_exec_info = {}
@@ -736,8 +802,8 @@ class JubeRun(object):
             mat = dir_exec_rex.match(files)
             if mat:
                 exec_dir = mat.group()
-                dir_exec_info[exec_dir] = ""
-                job_file_name = os.path.join(id_dir, mat.group(), "work", "stdout")
+                dir_exec_info[exec_dir] = ''
+                job_file_name = os.path.join(id_dir, mat.group(), 'work', 'stdout')
                 with  open(job_file_name, 'r') as job_file:
                     for line in job_file:
                         job_mat = job_id_rex.match(line)
