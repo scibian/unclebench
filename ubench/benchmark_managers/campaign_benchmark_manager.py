@@ -79,7 +79,7 @@ class CampaignManager(object):
         campaign_dir - execution directory under UBENCH_RUN_DIR_BENCH
     '''
 
-    def __init__(self, campaign_file, ref_results=None, campaign_freq=5):
+    def __init__(self, campaign_file, ref_results=None, campaign_freq=12):
         ''' Initialize CampaignManager object '''
 
         # compatibility with old Pyyaml versions
@@ -292,6 +292,7 @@ class CampaignManager(object):
         usr_msg.terminate()
         usr_msg.join()
         os.system('tput sgr0')
+        os.system('tput cnorm')
 
     def run(self):
         ''' Run campaign workflow '''
