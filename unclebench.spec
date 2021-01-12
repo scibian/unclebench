@@ -9,7 +9,7 @@
 Summary: UncleBench is a tool for automating the running of complex benchmarks on HPC infrastructures.
 Name: %{name}
 Version: %{version}
-Release:  2%{?dist}.edf
+Release:  3%{?dist}.edf
 Source0: %{name}-%{unmangled_version}.tar.gz
 License: GPLv3
 Group: Application/System
@@ -21,7 +21,8 @@ Url: https://github.com/scibian/%{__name}
 BuildRequires: git python36 python3-setuptools pandoc texlive-latex asciidoctor
 Requires: python3-clustershell python3-jinja2 python3-matplotlib
 Requires: python3-pyyaml python3-lxml python3-pandas 
-Requires: jube python3-seaborn edf-unclebench-platforms
+Requires: jube python3-seaborn 
+Requires: unclebench-benchmarks unclebench-platform
 
 %description
 This is a meta-package that provides UncleBench software.
@@ -86,6 +87,9 @@ rm -rf %{buildroot}
 /usr/share/unclebench
 
 %changelog
+* Wed Dec 16 2020 Romaric Kanyamibwa <romaric-externe.kanyamibwa@edf.fr> 1.0.2-3el8.edf
+- Add edf-unclebench-benchmarks 
+
 * Tue Dec 15 2020 Romaric Kanyamibwa <romaric-externe.kanyamibwa@edf.fr> 1.0.2-2el8.edf
 - Add edf-unclebench-platforms
 
