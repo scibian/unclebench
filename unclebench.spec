@@ -9,7 +9,7 @@
 Summary: UncleBench is a tool for automating the running of complex benchmarks on HPC infrastructures.
 Name: %{name}
 Version: %{version}
-Release:  3%{?dist}.edf
+Release:  4%{?dist}.edf
 Source0: %{name}-%{unmangled_version}.tar.gz
 License: GPLv3
 Group: Application/System
@@ -21,7 +21,7 @@ Url: https://github.com/scibian/%{__name}
 BuildRequires: git python36 python3-setuptools pandoc texlive-latex asciidoctor
 Requires: python3-clustershell python3-jinja2 python3-matplotlib
 Requires: python3-pyyaml python3-lxml python3-pandas 
-Requires: jube python3-seaborn 
+Requires: jube python3-seaborn
 Requires: unclebench-benchmarks unclebench-platform
 
 %description
@@ -61,15 +61,38 @@ install -m 644 docs/benchmarks_guide.html %{buildroot}/docs/
 %clean
 rm -rf %{buildroot}
 
+#############
+# Preambles #
+#############
+
+# unclebench-benchmarks package preamble
+%package benchmarks
+Summary: Benchmark description files for UncleBench.
+Group: Application/System
+Requires: git asciidoctor
+%description benchmarks
+Benchmarks description files for UncleBench benchmarking tool
+The package provide examples of xml benchmark description files.
+
+# unclebench-platform package preamble
+%package platform
+Summary: Platform description files for UncleBench benchmarking tool.
+Group: Application/System
+Requires: git asciidoctor
+%description platform
+Platform description files for UncleBench benchmarking tool
+The package provide examples of xml platform description files.
+
 ##################
 # Files Sections #
 ##################
 
+# Main meta-package
 %files
 %defattr(-,root,root,-)
 %doc README.md
-%doc /docs/benchmarks_guide.html
 %doc /docs/developer_guide.html
+#%doc /docs/campaign_guide.html
 %doc /docs/user_guide.html
 %doc /docs/man/ubench.1
 %doc /docs/man/ubench-compare.1
@@ -84,11 +107,27 @@ rm -rf %{buildroot}
 /usr/bin/ubench
 %{python3_sitelib}/ubench
 %{python3_sitelib}/*.egg-info
-/usr/share/unclebench
+/usr/share/unclebench/css
+/usr/share/unclebench/templates
+
+# benchmarks
+%files benchmarks
+%defattr(-,root,root,-)
+%doc /docs/benchmarks_guide.html
+/usr/share/unclebench/benchmarks
+
+# platform
+%files platform
+%defattr(-,root,root,-)
+%doc /docs/platform_guide.html
+/usr/share/unclebench/platform
 
 %changelog
+* Tue Jan 12 2021 Romaric Kanyamibwa <romaric-externe.kanyamibwa@edf.fr> 1.0.2-4el8.edf
+- Add benchmark and platform meta-package
+
 * Wed Dec 16 2020 Romaric Kanyamibwa <romaric-externe.kanyamibwa@edf.fr> 1.0.2-3el8.edf
-- Add edf-unclebench-benchmarks 
+- Add edf-unclebench-benchmarks
 
 * Tue Dec 15 2020 Romaric Kanyamibwa <romaric-externe.kanyamibwa@edf.fr> 1.0.2-2el8.edf
 - Add edf-unclebench-platforms
