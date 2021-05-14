@@ -1,3 +1,9 @@
+unclebench (1:1.0.2-0sci9u2) scibian9; urgency=medium
+
+  * Fix dep on python2 clustershell lib
+
+ -- Rémi Palancher <remi-externe.palancher@edf.fr>  Fri, 14 May 2021 16:58:02 +0200
+
 unclebench (1:1.0.2-0sci9u1) scibian9; urgency=medium
 
   * New Scibian release 1:1.0.2-0sci9u1
