@@ -19,7 +19,7 @@ Build-Depends: asciidoctor,
 Package: unclebench
 Architecture: all
 Depends: asciidoctor,
-         clustershell,
+         python-clustershell,
          jube,
          python-tk,
          python-jinja2,
