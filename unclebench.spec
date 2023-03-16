@@ -9,7 +9,7 @@
 Summary: UncleBench is a tool for automating the running of complex benchmarks on HPC infrastructures.
 Name: unclebench
 Version: 1.0.2
-Release:  4%{?dist}.edf
+Release:  5%{?dist}.edf
 Source0: %{name}-%{unmangled_version}.tar.gz
 License: GPLv3
 Group: Application/System
@@ -123,6 +123,9 @@ The package provide examples of xml platform description files.
 /usr/share/unclebench/platform
 
 %changelog
+* Thu Mar 16 2023 Mhemed Mtimet <mhemed-externe.mtimet@edf.fr> 1.0.2-5el8.edf
+- fix build error related to name , version variable
+
 * Tue Jan 12 2021 Romaric Kanyamibwa <romaric-externe.kanyamibwa@edf.fr> 1.0.2-4el8.edf
 - Add benchmark and platform meta-package
 
