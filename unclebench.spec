@@ -7,8 +7,8 @@
 
 # Main preamble
 Summary: UncleBench is a tool for automating the running of complex benchmarks on HPC infrastructures.
-Name: %{name}
-Version: %{version}
+Name: unclebench
+Version: 1.0.2
 Release:  4%{?dist}.edf
 Source0: %{name}-%{unmangled_version}.tar.gz
 License: GPLv3
