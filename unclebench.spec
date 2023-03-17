@@ -47,16 +47,17 @@ make --directory=docs
 python3 setup.py install --single-version-externally-managed -O1 --root=%{buildroot}
 install -d %{buildroot}/etc/unclebench
 install -d %{buildroot}/usr/share/unclebench/
-install -d %{buildroot}/docs
-cp -r docs/man %{buildroot}/docs/
+install -d %{buildroot}/usr/share/unclebench/docs
+cp -r docs/man %{buildroot}/usr/share/unclebench/docs/
 cp -r platform %{buildroot}/usr/share/unclebench/
 cp -r benchmarks %{buildroot}/usr/share/unclebench/
 cp -r css %{buildroot}/usr/share/unclebench/
 cp -r templates %{buildroot}/usr/share/unclebench/
 install -m 644 configuration/ubench.conf %{buildroot}/etc/unclebench
-install -m 644 docs/user_guide.html %{buildroot}/docs/
-install -m 644 docs/developer_guide.html %{buildroot}/docs/
-install -m 644 docs/benchmarks_guide.html %{buildroot}/docs/
+install -m 644 docs/user_guide.html %{buildroot}/usr/share/unclebench/docs/
+install -m 644 docs/developer_guide.html %{buildroot}/usr/share/unclebench/docs/
+install -m 644 docs/benchmarks_guide.html %{buildroot}/usr/share/unclebench/docs/
+install -m 644 docs/platform_guide.html %{buildroot}/usr/share/unclebench/docs/
 
 %clean
 rm -rf %{buildroot}
@@ -91,18 +92,18 @@ The package provide examples of xml platform description files.
 %files
 %defattr(-,root,root,-)
 %doc README.md
-%doc /docs/developer_guide.html
-#%doc /docs/campaign_guide.html
-%doc /docs/user_guide.html
-%doc /docs/man/ubench.1
-%doc /docs/man/ubench-compare.1
-%doc /docs/man/ubench-fetch.1
-%doc /docs/man/ubench-list.1
-%doc /docs/man/ubench-listparams.1
-%doc /docs/man/ubench-log.1
-%doc /docs/man/ubench-report.1
-%doc /docs/man/ubench-result.1
-%doc /docs/man/ubench-run.1
+%doc /usr/share/unclebench/docs/developer_guide.html
+#%doc /usr/share/unclebench/docs/campaign_guide.html
+%doc /usr/share/unclebench/docs/user_guide.html
+%doc /usr/share/unclebench/docs/man/ubench.1
+%doc /usr/share/unclebench/docs/man/ubench-compare.1
+%doc /usr/share/unclebench/docs/man/ubench-fetch.1
+%doc /usr/share/unclebench/docs/man/ubench-list.1
+%doc /usr/share/unclebench/docs/man/ubench-listparams.1
+%doc /usr/share/unclebench/docs/man/ubench-log.1
+%doc /usr/share/unclebench/docs/man/ubench-report.1
+%doc /usr/share/unclebench/docs/man/ubench-result.1
+%doc /usr/share/unclebench/docs/man/ubench-run.1
 %config /etc/unclebench/ubench.conf
 /usr/bin/ubench
 %{python3_sitelib}/ubench
@@ -113,13 +114,13 @@ The package provide examples of xml platform description files.
 # benchmarks
 %files benchmarks
 %defattr(-,root,root,-)
-%doc /docs/benchmarks_guide.html
+%doc /usr/share/unclebench/docs/benchmarks_guide.html
 /usr/share/unclebench/benchmarks
 
 # platform
 %files platform
 %defattr(-,root,root,-)
-%doc /docs/platform_guide.html
+%doc /usr/share/unclebench/docs/platform_guide.html
 /usr/share/unclebench/platform
 
 %changelog
