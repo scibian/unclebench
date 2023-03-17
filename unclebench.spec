@@ -18,7 +18,7 @@ Vendor: EDF CCN HPC <dsp-cspito-ccn-hpc@edf.fr>
 Packager: EDF CCN HPC <dsp-cspito-ccn-hpc@edf.fr>
 Url: https://github.com/scibian/%{__name}
 
-BuildRequires: git python36 python3-setuptools pandoc texlive-latex asciidoctor
+BuildRequires: git python36 python3-setuptools pandoc texlive-latex rubygem-asciidoctor
 Requires: python3-clustershell python3-jinja2 python3-matplotlib
 Requires: python3-pyyaml python3-lxml python3-pandas 
 Requires: jube python3-seaborn
