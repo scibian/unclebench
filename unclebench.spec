@@ -9,7 +9,7 @@
 Summary: UncleBench is a tool for automating the running of complex benchmarks on HPC infrastructures.
 Name: unclebench
 Version: 1.0.2
-Release:  5%{?dist}.edf
+Release:  6%{?dist}.edf
 Source0: %{name}-%{unmangled_version}.tar.gz
 License: GPLv3
 Group: Application/System
@@ -124,6 +124,10 @@ The package provide examples of xml platform description files.
 /usr/share/unclebench/platform
 
 %changelog
+* Fri Mar 17 2023 Kwame Amedodji <kwame-externe.amedodji@edf.fr> 1.0.2-6el8.edf
+- rename asciidoctor package to rubygem-asciidoctor
+- relocate docs to /usr/share/unclebench from /!
+
 * Thu Mar 16 2023 Mhemed Mtimet <mhemed-externe.mtimet@edf.fr> 1.0.2-5el8.edf
 - fix build error related to name , version variable
 
