@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jube>
 
-    <include-path>
-        <path> $UBENCH_PLATFORM_DIR </path>
-    </include-path>
-    <include from="platforms.xml" path="include-path"/>
+      <include-path>
+            <path> $UBENCH_PLATFORM_DIR </path>
+      </include-path>
+      <include from="platforms.xml" path="include-path"/>
 
-    <multisource>
-	<source protocol="https" name="hpl">
-	    <url>http://www.netlib.org/benchmark/</url>
-	    <file>/hpl/hpl-2.2.tar.gz</file>
-	</source>
-    </multisource>
+      <multisource>
+            <source protocol="https" name="hpl">
+                  <url>http://www.netlib.org/benchmark/</url>
+                  <file>/hpl/hpl-2.2.tar.gz</file>
+            </source>
+      </multisource>
 
     <benchmark name="hpl" outpath="benchmark_runs">
 	<comment>HPL benchmarks</comment>
@@ -26,9 +26,9 @@
 	<parameterset name="container_parameters">
             <parameter name="container_image">none</parameter>
             <parameter name="container_exec_command" mode="python">
-		["",
-		"singularity exec ${container_image}"][0 if '$container_image'=='none' else 1]
-	    </parameter>
+                  ["",
+                  "singularity exec ${container_image}"][0 if '$container_image'=='none' else 1]
+            </parameter>
 	</parameterset>
 
 	<parameterset name="variant_set">
@@ -52,6 +52,30 @@
 
             <parameter name="variant_N" mode="python" type="int" separator="??" >
 		int( round( ${variant_Ntemp} / ${variant_NB} ) * ${variant_NB})
+            </parameter>
+
+            <parameter name="SWAP" mode="python" type="int">
+		64
+            </parameter>
+
+            <parameter name="DEPTHs" mode="python" type="int">
+		1
+            </parameter>
+
+            <parameter name="BCASTs" mode="python" type="int">
+		1
+            </parameter>
+
+            <parameter name="RFACTs" mode="python" type="int">
+		1
+            </parameter>
+
+            <parameter name="NDIVs" mode="python" type="int">
+		2
+            </parameter>
+
+            <parameter name="NBMINs" mode="python" type="int">
+		4
             </parameter>
 
 	</parameterset>
@@ -100,6 +124,12 @@
             <sub source="#NNS#" dest="$variant_N"/>
             <sub source="#NNBS#" dest="1"/>
             <sub source="#NBS#" dest="$variant_NB"/>
+            <sub source="#NBMINs#" dest="$NBMINs"/>
+            <sub source="#NDIVs#" dest="$NDIVs"/>
+            <sub source="#RFACTs#" dest="$RFACTs"/>
+            <sub source="#BCASTs#" dest="$BCASTs"/>
+            <sub source="#DPTH#" dest="$DEPTHs"/>
+            <sub source="#SWAP#" dest="$SWAP"/>
 	</substituteset>
 
 	<parameterset name="system_parameters" init_with="platform.xml">
@@ -160,6 +190,7 @@
             <table name="result" style="csv" sort="nodes">
 		<column>nodes</column>
 		<column>HPL</column>
+            <column>mpi_version</column>
 		<column>modules</column>
 		<column>container_image</column>
             </table>
