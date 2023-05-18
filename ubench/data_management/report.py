@@ -91,7 +91,7 @@ class Report:
         """
         with open(metadata_file, 'r') as mfile:
             try:
-                self.metadata = yaml.load(mfile)
+                self.metadata = yaml.load(mfile, Loader=yaml.FullLoader)
             except Exception as e:
                 print("Cannot load metadata file:"+str(e))
 
@@ -190,7 +190,6 @@ class Report:
         report_from_contexts['compare_comment'] = ''
         report_from_contexts['results_filter'] = []
 
-
         dic_contexts = {}
         for ctx_el in self.metadata['contexts']:
             ctx_bench_name, ctx_dic = _dic_to_tuple(ctx_el)
@@ -203,7 +202,7 @@ class Report:
                 report_from_contexts[r_field] = dic_contexts[r_field]
             elif r_field in default_fields['contexts']:
                 report_from_contexts[r_field] = default_fields['contexts'][r_field]
-            else:
+            elif not r_field in report_from_contexts:
                 print(("Please precise {} for benchmark {}".format(r_field, benchmark_name)))
                 exit
         for r_field in self.context_fields:
