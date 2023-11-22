@@ -10,7 +10,7 @@ Vcs-Browser: https://github.com/scibian/unclebench
 Vcs-Git: https://github.com/scibian/unclebench.git
 Homepage: https://github.com/edf-hpc/unclebench
 Build-Depends: asciidoctor,
-               debhelper (>= 9),
+               debhelper (>= 10),
                dh-python,
                pandoc,
                python-all,
