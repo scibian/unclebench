@@ -1,3 +1,9 @@
+unclebench (1:1.1.0-0sci11u1) scibian11; urgency=medium
+
+  * bump d/compat to 13
+
+ -- KWAME AMEDODJI <kwame-externe.amedodji@edf.fr>  Wed, 22 Nov 2023 22:00:35 +0100
+
 unclebench (1:1.1.0-0sci10u1) scibian10; urgency=medium
 
   * First port to buster
