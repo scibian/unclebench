@@ -1,3 +1,9 @@
+unclebench (1:1.1.0-0sci10u1) scibian10; urgency=medium
+
+  * First port to buster
+
+ -- KWAME AMEDODJI <kwame-externe.amedodji@edf.fr>  Wed, 22 Nov 2023 20:41:56 +0100
+
 unclebench (1:1.1.0-0sci9u1) scibian9; urgency=medium
 
   * New upstream version 1.1.0
