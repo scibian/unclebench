@@ -1,3 +1,10 @@
+unclebench (1:1.1.1-0sci11u1) scibian11; urgency=medium
+
+  * New upstream version 1.1.1
+  * port packaging code to python3
+
+ -- KWAME AMEDODJI <kwame-externe.amedodji@edf.fr>  Fri, 24 Nov 2023 09:36:35 +0100
+
 unclebench (1:1.1.0-0sci11u1) scibian11; urgency=medium
 
   * bump d/compat to 13
