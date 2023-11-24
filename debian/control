@@ -13,26 +13,26 @@ Build-Depends: asciidoctor,
                debhelper (>= 10),
                dh-python,
                pandoc,
-               python-all,
-               python-setuptools
+               python3-all,
+               python3-setuptools
 
 Package: unclebench
 Architecture: all
 Depends: asciidoctor,
-         python-clustershell,
+         python3-clustershell,
          jube,
-         python-tk,
-         python-jinja2,
-         python-lxml,
-         python-matplotlib,
-         python-pandas,
-         python-yaml,
+         python3-tk,
+         python3-jinja2,
+         python3-lxml,
+         python3-matplotlib,
+         python3-pandas,
+         python3-yaml,
          unclebench-benchmarks (= ${binary:Version}),
          unclebench-platform (= ${binary:Version}),
          ${misc:Depends},
-         ${python:Depends},
+         ${python3:Depends},
          ${shlibs:Depends}
-Recommends: python-pyslurm
+Recommends: python3-pyslurm
 Suggests: lmod | environment-modules
 Description: Automated benchmarking tool
  This package provides UncleBench software suite with all its components.
@@ -45,7 +45,7 @@ Description: Platform description files for UncleBench benchmarking tool
 
 Package: unclebench-benchmarks
 Architecture: all
-Depends: python, ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}
+Depends: python3, ${misc:Depends}, ${python3:Depends}, ${shlibs:Depends}
 Description: Benchmarks description files for UncleBench benchmarking tool
  The package provide examples of xml benchmark description files.
 
