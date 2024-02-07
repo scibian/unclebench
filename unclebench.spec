@@ -1,14 +1,14 @@
 # Configuration Logic
 %define name unclebench
-%define version 1.1.1
-%define unmangled_version 1.1.1
+%define version 1.1.2
+%define unmangled_version 1.1.2
 %define debug_package %{nil}
 %undefine __brp_mangle_shebangs
 
 # Main preamble
 Summary: UncleBench is a tool for automating the running of complex benchmarks on HPC infrastructures.
 Name: unclebench
-Version: 1.1.1
+Version: 1.1.2
 Release:  1%{?dist}.edf
 Source0: %{name}-%{unmangled_version}.tar.gz
 License: GPLv3
@@ -124,6 +124,9 @@ The package provide examples of xml platform description files.
 /usr/share/unclebench/platform
 
 %changelog
+* Wed Feb 07 2024 Kwame Amedodji <kwame-externe.amedodji@edf.fr> 1.1.2-1el8.edf
+- New upstream version 1.1.2
+
 * Fri Nov 24 2023 Kwame Amedodji <kwame-externe.amedodji@edf.fr> 1.1.1-1el8.edf
 - New upstream version 1.1.1
 
