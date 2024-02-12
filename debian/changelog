@@ -1,3 +1,9 @@
+unclebench (1:1.1.3-sci10u1) scibian10; urgency=medium
+
+  * New upstream version 1.1.3
+
+ -- KWAME AMEDODJI <kwame-externe.amedodji@edf.fr>  Mon, 12 Feb 2024 14:54:11 +0100
+
 unclebench (1:1.1.2-0sci10u1) scibian10; urgency=medium
 
   * Release 1:1.1.1-0sci10u1
